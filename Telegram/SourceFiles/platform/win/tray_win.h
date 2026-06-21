@@ -58,7 +58,8 @@ public:
 		Window::CounterLayerArgs &&args,
 		bool smallIcon,
 		bool monochrome,
-		bool supportMode);
+		bool supportMode,
+		bool brandImage = false);
 	[[nodiscard]] static QString QuitJumpListIconPath();
 	[[nodiscard]] static QString GhostJumpListIconPath();
 

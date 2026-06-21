@@ -18,6 +18,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
+#include "ayu/features/furry_lang.h"
 #include "ayu/features/streamer_mode/streamer_mode.h"
 #include "window/window_controller.h"
 #include "lang_auto.h"
@@ -86,7 +87,7 @@ void Tray::rebuildMenu() {
 			_activeForTrayIconAction = Core::App().isActiveForTrayMenu();
 			return _activeForTrayIconAction
 				? tr::lng_minimize_to_tray(tr::now)
-				: tr::lng_open_from_tray(tr::now).replace("Telegram", "AyuGram");
+				: tr::lng_open_from_tray(tr::now).replace("Telegram", "FurryGram");
 		});
 
 		_tray.addAction(
@@ -156,10 +157,33 @@ void Tray::rebuildMenu() {
 			});
 	}
 
+	// FurryGram: Focus mode quick toggle from the tray.
+	{
+		auto turnFocusText = rpl::combine(
+			_textUpdates.events_starting_with({}),
+			AyuSettings::getInstance().focusEnabledValue()
+		) | rpl::map([=](auto, bool active) {
+			return active
+				? FurryLang::Pick(
+					u"Disable Focus"_q,
+					QString::fromUtf8("\xD0\x92\xD1\x8B\xD0\xBA\xD0\xBB\xD1\x8E\xD1\x87\xD0\xB8\xD1\x82\xD1\x8C\x20\xD1\x84\xD0\xBE\xD0\xBA\xD1\x83\xD1\x81"))
+				: FurryLang::Pick(
+					u"Enable Focus"_q,
+					QString::fromUtf8("\xD0\x92\xD0\xBA\xD0\xBB\xD1\x8E\xD1\x87\xD0\xB8\xD1\x82\xD1\x8C\x20\xD1\x84\xD0\xBE\xD0\xBA\xD1\x83\xD1\x81"));
+		});
+		_tray.addAction(
+			std::move(turnFocusText),
+			[=]
+			{
+				auto &focus = AyuSettings::getInstance();
+				focus.setFocusEnabled(!focus.focusEnabled());
+			});
+	}
+
 	auto quitText = _textUpdates.events(
 	) | rpl::map([=]
 	{
-		return tr::lng_quit_from_tray(tr::now).replace("Telegram", "AyuGram");
+		return tr::lng_quit_from_tray(tr::now).replace("Telegram", "FurryGram");
 	});
 	_tray.addAction(std::move(quitText), [] { Core::Quit(); });
 

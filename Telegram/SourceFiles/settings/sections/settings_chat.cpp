@@ -2364,6 +2364,14 @@ void SetupDefaultThemes(
 		st::settingsCheckboxPadding);
 	systemAccentWrap->setDuration(0);
 
+	// FurryGram custom themes get their own labeled row at the bottom.
+	Ui::AddSkip(container);
+	Ui::AddSubsectionTitle(
+		container,
+		rpl::single(QString("FurryGram Themes")));
+	const auto furryBlock = container->add(object_ptr<Ui::FixedHeightWidget>(
+		container));
+
 	const auto updateMessageShotPalette = [=](const QString &path)
 	{
 		if (path.isEmpty()) { // for Default theme (otherwise doesn't dispaly name properly)
@@ -2451,7 +2459,7 @@ void SetupDefaultThemes(
 			false);
 		const auto weak = check.get();
 		const auto result = Ui::CreateChild<Ui::Radioenum<Type>>(
-			block,
+			IsFurryTheme(scheme.type) ? furryBlock : block,
 			group,
 			scheme.type,
 			QString(),
@@ -2582,39 +2590,63 @@ void SetupDefaultThemes(
 		group->setValue(type);
 	}, container->lifetime());
 
-	for (const auto button : buttons) {
-		button->setCheckAlignment(style::al_top);
-		button->resizeToWidth(button->width());
+	// Split buttons by their block (stock vs FurryGram), aligned to kSchemesList order.
+	auto stockButtons = std::vector<Ui::Radioenum<Type>*>();
+	auto furryButtons = std::vector<Ui::Radioenum<Type>*>();
+	for (auto i = 0; i != int(kSchemesList.size()); ++i) {
+		if (IsFurryTheme(kSchemesList[i].type)) {
+			furryButtons.push_back(buttons[i]);
+		} else {
+			stockButtons.push_back(buttons[i]);
+		}
 	}
-	block->resize(block->width(), buttons[0]->height());
-	block->widthValue(
-	) | rpl::on_next([buttons = std::move(buttons)](int width) {
-		Expects(!buttons.empty());
-
-		const auto padding = st::settingsButtonNoIcon.padding;
-		width -= padding.left() + padding.right();
-		const auto desired = st::settingsThemePreviewSize.width();
-		const auto count = int(buttons.size());
-		const auto skips = count - 1;
-		const auto minSkip = st::settingsThemeMinSkip;
-		const auto single = [&] {
-			if (width >= skips * minSkip + count * desired) {
-				return desired;
-			}
-			return (width - skips * minSkip) / count;
-		}();
-		if (single <= 0) {
+	const auto layoutRow = [](
+			not_null<Ui::FixedHeightWidget*> block,
+			std::vector<Ui::Radioenum<Type>*> rowButtons) {
+		if (rowButtons.empty()) {
 			return;
 		}
-		const auto fullSkips = width - count * single;
-		const auto skip = fullSkips / float64(skips);
-		auto left = padding.left() + 0.;
-		for (const auto button : buttons) {
-			button->resizeToWidth(single);
-			button->moveToLeft(int(base::SafeRound(left)), 0);
-			left += button->width() + skip;
+		for (const auto button : rowButtons) {
+			button->setCheckAlignment(style::al_top);
+			button->resizeToWidth(button->width());
 		}
-	}, block->lifetime());
+		block->resize(block->width(), rowButtons[0]->height());
+		block->widthValue(
+		) | rpl::on_next([buttons = std::move(rowButtons)](int width) {
+			Expects(!buttons.empty());
+
+			const auto padding = st::settingsButtonNoIcon.padding;
+			width -= padding.left() + padding.right();
+			const auto desired = st::settingsThemePreviewSize.width();
+			const auto count = int(buttons.size());
+			const auto skips = count - 1;
+			const auto minSkip = st::settingsThemeMinSkip;
+			const auto single = [&] {
+				if (!skips) {
+					return std::min(width, desired);
+				}
+				if (width >= skips * minSkip + count * desired) {
+					return desired;
+				}
+				return (width - skips * minSkip) / count;
+			}();
+			if (single <= 0) {
+				return;
+			}
+			const auto fullSkips = width - count * single;
+			const auto skip = skips
+				? (fullSkips / float64(skips))
+				: 0.;
+			auto left = padding.left() + 0.;
+			for (const auto button : buttons) {
+				button->resizeToWidth(single);
+				button->moveToLeft(int(base::SafeRound(left)), 0);
+				left += button->width() + skip;
+			}
+		}, block->lifetime());
+	};
+	layoutRow(block, std::move(stockButtons));
+	layoutRow(furryBlock, std::move(furryButtons));
 
 	if (AyuFeatures::MessageShot::isChoosingTheme()) {
 		palette->selected() | rpl::on_next(

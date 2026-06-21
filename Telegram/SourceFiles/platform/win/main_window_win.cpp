@@ -729,6 +729,27 @@ void MainWindow::initHook() {
 	validateWindowTheme(
 		Core::App().settings().nativeWindowFrame(),
 		Window::Theme::IsNightMode());
+
+	// FurryGram: Anti-screenshare. WDA_EXCLUDEFROMCAPTURE makes the window render
+	// black in screenshots / screen recordings / screen-sharing. Apply current
+	// value and react to live setting changes.
+	const auto applyAntiScreenshare = [=](bool on) {
+		if (!_hWnd) {
+			return;
+		}
+		// 0x11 = WDA_EXCLUDEFROMCAPTURE (Win10 2004+), 0 = WDA_NONE.
+		const auto affinity = on ? DWORD(0x11) : DWORD(0);
+		SetWindowDisplayAffinity(_hWnd, affinity);
+		const auto root = GetAncestor(_hWnd, GA_ROOT);
+		if (root && root != _hWnd) {
+			SetWindowDisplayAffinity(root, affinity);
+		}
+	};
+	applyAntiScreenshare(AyuSettings::getInstance().antiScreenshare());
+	AyuSettings::getInstance().antiScreenshareChanges(
+	) | rpl::on_next([=](bool on) {
+		applyAntiScreenshare(on);
+	}, lifetime());
 }
 
 void MainWindow::validateWindowTheme(bool native, bool night) {

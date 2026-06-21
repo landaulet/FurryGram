@@ -292,6 +292,14 @@ QString embeddedThemeDisplayName(Window::Theme::EmbeddedType type) {
 		return tr::lng_settings_theme_tinted(tr::now);
 	case Window::Theme::EmbeddedType::NightGreen:
 		return tr::lng_settings_theme_night(tr::now);
+	case Window::Theme::EmbeddedType::FurryAero:
+		return QString("FurryGram Aero");
+	case Window::Theme::EmbeddedType::FurryViolet:
+		return QString("FurryGram Violet");
+	case Window::Theme::EmbeddedType::FurrySunset:
+		return QString("FurryGram Sunset");
+	case Window::Theme::EmbeddedType::FurryForest:
+		return QString("FurryGram Forest");
 	}
 	return tr::ayu_MessageShotThemeDefault(tr::now);
 }

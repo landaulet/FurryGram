@@ -122,6 +122,10 @@ bool prependPseudoReply(
 
 void getRegistrationDate(not_null<PeerData*> peer, Fn<void(TextWithEntities)> callback);
 
+// FurryGram: locally cached short registration date (filled after a fetch),
+// so it can be shown inline in the profile without re-querying the bot.
+[[nodiscard]] std::optional<QString> getCachedRegistrationDate(ID userId);
+
 QString getBetterLinkPreview(const QString &url);
 
 void applyGhostScheduling(

@@ -1834,6 +1834,14 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 				return false;
 			});
 			AddRegistrationOrCreationButton(controller, _peer, idInfo, fitLabelToButton);
+
+			// FurryGram: inline registration date (cached; fetched once if unknown).
+			if (!user->isBot() && !user->isServiceUser()) {
+				addInfoOneLine(
+					rpl::single(QString("Registration")),
+					RegistrationDateValue(user),
+					QString());
+			}
 		}
 	} else {
 		const auto topicRootId = _topic ? _topic->rootId() : 0;

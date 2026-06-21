@@ -107,7 +107,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_document.h"
 #include "data/data_channel.h"
 #include "data/data_forum_topic.h"
+#include "data/data_photo.h"
 #include "data/data_photo_media.h"
+#include "ayu/features/ocr.h" // FurryGram: local OCR.
+#include "ui/boxes/confirm_box.h" // Ui::MakeInformBox
+#include "settings.h" // cWorkingDir
 #include "data/data_peer_values.h"
 #include "data/data_chat.h"
 #include "data/data_user.h"
@@ -2791,6 +2795,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 		AyuUi::AddHideMessageAction(_menu, item);
 		AyuUi::AddUserMessagesAction(_menu, item);
 		AyuUi::AddRepeatMessageAction(_menu, item, HistoryView::Context::History);
+		AyuUi::AddCopyAsMarkdownAction(_menu, item);
 		AyuUi::AddMessageDetailsAction(_menu, item);
 	};
 	const auto addPhotoActions = [&](not_null<PhotoData*> photo, HistoryItem *item) {
@@ -2811,9 +2816,37 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 					photo);
 			}, &st::menuIconStickers);
 		}
+		// FurryGram: temporary engine-validation hook — OCR the whole photo.
+		if (!photo->isNull() && media && media->loaded()) {
+			_menu->addAction(QString("Recognize text (OCR)"), [=] {
+				const auto view = photo->activeMediaView();
+				const auto image = view
+					? view->image(Data::PhotoSize::Large)
+					: nullptr;
+				if (!image) {
+					return;
+				}
+				auto bytes = image->original();
+				const auto dataPath = cWorkingDir()
+					+ u"tdata/furry_ocr/tessdata/"_q;
+				const auto weak = base::make_weak(controller);
+				crl::async([=, image = std::move(bytes)]() mutable {
+					auto text = Ayu::Ocr::Recognize(
+						image,
+						u"eng+rus"_q,
+						dataPath);
+					crl::on_main([=]() mutable {
+						if (const auto strong = weak.get()) {
+							Ayu::Ocr::ShowResultBox(strong->uiShow(), text);
+						}
+					});
+				});
+			}, &st::menuIconCopy);
+		}
 	};
 	auto rateTranscriptionItem = (HistoryItem*)(nullptr);
 	const auto addDocumentActions = [&](not_null<DocumentData*> document, HistoryItem *item) {
+		AyuUi::AddRevealHiddenMessageAction(_menu, document, controller);
 		if (document->loading()) {
 			_menu->addAction(tr::lng_context_cancel_download(tr::now), [=] {
 				cancelContextDownload(document);

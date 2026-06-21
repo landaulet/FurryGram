@@ -9171,22 +9171,29 @@ void HistoryWidget::checkCharsCount() {
 }
 
 void HistoryWidget::checkCharsLimitation() {
-	if (!_history || !_editMsgId) {
+	if (!_history) {
 		_charsLimitation = nullptr;
 		return;
 	}
-	const auto item = session().data().message(_history->peer, _editMsgId);
-	if (!item) {
+	const auto item = _editMsgId
+		? session().data().message(_history->peer, _editMsgId)
+		: nullptr;
+	if (_editMsgId && !item) {
 		_charsLimitation = nullptr;
 		return;
 	}
-	const auto hasMediaWithCaption = item->media()
+	const auto hasMediaWithCaption = item
+		&& item->media()
 		&& item->media()->allowsEditCaption();
 	const auto maxCaptionSize = !hasMediaWithCaption
 		? MaxMessageSize
 		: Data::PremiumLimits(&session()).captionLengthCurrent();
-	const auto remove = _fieldCharsCountManager.count() - maxCaptionSize;
-	if (remove > 0) {
+	const auto count = _fieldCharsCountManager.count();
+	const auto remove = count - maxCaptionSize;
+	// FurryGram: a live character counter — show how many characters are left
+	// once a message gets long (the over-limit warning still shows in red).
+	constexpr auto kShowCounterFrom = 1000;
+	if (remove > 0 || count >= kShowCounterFrom) {
 		if (!_charsLimitation) {
 			_charsLimitation = base::make_unique_q<CharactersLimitLabel>(
 				this,
@@ -10099,7 +10106,38 @@ void HistoryWidget::drawField(Painter &p, const QRect &rect) {
 	}
 	p.setInactive(
 		controller()->isGifPausedAtLeastFor(Window::GifPauseReason::Any));
+
 	p.fillRect(myrtlrect(0, backy, width(), backh), st::historyReplyBg);
+
+	// FurryGram: keep the stock flat compose edge (a dark/bright seam against the
+	// wallpaper is inherent to any docked bar, so we don't restyle it) and add a
+	// single accent touch — an accent ring around the send button. Only in the
+	// plain compose state (no reply/edit/forward/keyboard/preview/recording).
+	const auto composeBar = AyuSettings::getInstance().furryComposeBar()
+		&& !_editMsgId
+		&& !_replyTo
+		&& !hasForward
+		&& !_kbReplyTo
+		&& !_previewDrawPreview
+		&& !_suggestOptions
+		&& !isRecording();
+	if (composeBar && _send && !_send->isHidden()) {
+		auto hq = PainterHighQualityEnabler(p);
+		const auto d = std::min(_send->width(), _send->height())
+			- st::historySendPadding;
+		if (d > 0) {
+			const auto circle = QRect(
+				_send->x() + (_send->width() - d) / 2,
+				_send->y() + (_send->height() - d) / 2,
+				d,
+				d);
+			auto pen = QPen(st::windowBgActive->c);
+			pen.setWidthF(st::lineWidth * 1.5);
+			p.setPen(pen);
+			p.setBrush(Qt::NoBrush);
+			p.drawEllipse(myrtlrect(circle));
+		}
+	}
 
 	const auto media = (!_previewDrawPreview && drawMsgText)
 		? drawMsgText->media()

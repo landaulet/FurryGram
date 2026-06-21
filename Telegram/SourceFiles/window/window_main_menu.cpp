@@ -1,4 +1,4 @@
-/*
+﻿/*
 This file is part of Telegram Desktop,
 the official desktop application for the Telegram messaging service.
 
@@ -82,6 +82,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
+#include "ayu/features/channel_search.h"
+#include "ayu/features/furry_lang.h"
 #include "ayu/utils/telegram_helpers.h"
 #include "boxes/abstract_box.h"
 #include "ayu/features/streamer_mode/streamer_mode.h"
@@ -381,6 +383,35 @@ MainMenu::MainMenu(
 		_version->moveToLeft(st::mainMenuFooterLeft, _footer->height() - st::mainMenuVersionBottom - _version->height());
 	}, _footer->lifetime());
 
+	// FurryGram: brand paw accent on the right of the drawer footer. 🐾
+	// Uses the same artwork as the tray icon, drawn as an alpha mask tinted to
+	// the footer text colour, so the shape matches the logo exactly.
+	_footer->paintRequest(
+	) | rpl::on_next([=] {
+		static const auto Paw = QImage(u":/gui/furrygram-tray.png"_q);
+		if (Paw.isNull()) {
+			return;
+		}
+		auto p = QPainter(_footer.get());
+		const auto s = qRound(st::mainMenuTelegramLabel.style.font->height * 2.2);
+		const auto x = _footer->width() - st::mainMenuFooterLeft - s;
+		const auto y = _footer->height()
+			- st::mainMenuTelegramBottom
+			- _telegram->height();
+		auto glyph = Paw.scaled(
+			s,
+			s,
+			Qt::KeepAspectRatio,
+			Qt::SmoothTransformation
+		).convertToFormat(QImage::Format_ARGB32_Premultiplied);
+		{
+			auto q = QPainter(&glyph);
+			q.setCompositionMode(QPainter::CompositionMode_SourceIn);
+			q.fillRect(glyph.rect(), st::windowSubTextFg);
+		}
+		p.drawImage(QPoint(x, y), glyph);
+	}, _footer->lifetime());
+
 	rpl::combine(
 		heightValue(),
 		_inner->heightValue()
@@ -391,7 +422,7 @@ MainMenu::MainMenu(
 	parentResized();
 
 	_telegram->setMarkedText(tr::link(
-		u"AyuGram Desktop"_q,
+		u"FurryGram Desktop"_q,
 		u"https://ayugram.one"_q));
 	_telegram->setLinksTrusted();
 	_version->setMarkedText(
@@ -742,6 +773,17 @@ void MainMenu::setupMenu() {
 			}
 		});
 
+		if (settings.showChannelSearchInDrawer())
+		addAction(
+			rpl::single(FurryLang::Pick(
+				u"Find channels"_q,
+				// "Найти каналы"
+				QString::fromUtf8("\xD0\x9D\xD0\xB0\xD0\xB9\xD1\x82\xD0\xB8\x20\xD0\xBA\xD0\xB0\xD0\xBD\xD0\xB0\xD0\xBB\xD1\x8B"))),
+			{ &st::menuIconChannel }
+		)->setClickedCallback([=] {
+			controller->show(Ayu::ChannelSearch::Box(controller));
+		});
+
 		if (settings.showContactsInDrawer())
 		addAction(
 			tr::lng_menu_contacts(),
@@ -923,6 +965,24 @@ void MainMenu::setupMenu() {
 				}
 			},
 			streamerModeToggle->lifetime());
+	}
+
+	// FurryGram: Focus mode quick toggle.
+	{
+		const auto focusToggle = addAction(
+			rpl::single(FurryLang::Pick(
+				u"Focus"_q,
+				QString::fromUtf8("\xD0\xA4\xD0\xBE\xD0\xBA\xD1\x83\xD1\x81"))),
+			{&st::menuIconMute}
+		)->toggleOn(AyuSettings::getInstance().focusEnabledValue());
+
+		focusToggle->toggledChanges(
+		) | rpl::on_next(
+			[](bool enabled)
+			{
+				AyuSettings::getInstance().setFocusEnabled(enabled);
+			},
+			focusToggle->lifetime());
 	}
 }
 

@@ -105,6 +105,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ayu/ayu_infra.h"
 #include "ayu/features/streamer_mode/streamer_mode.h"
 
+// FurryGram: embedded QuickJS scripting engine.
+#include "ayu/scripting/furry_scripts.h"
+
 
 namespace Core {
 namespace {
@@ -266,6 +269,9 @@ Application::~Application() {
 }
 
 void Application::run() {
+	// FurryGram: start the QuickJS scripting engine (loads user plugins).
+	FurryScripts::Start();
+
 	// Depends on OpenSSL on macOS, so on ThirdParty::start().
 	// Depends on notifications settings.
 	_notifications = std::make_unique<Window::Notifications::System>();
@@ -1901,7 +1907,7 @@ void Application::RegisterUrlScheme() {
 		.arguments = arguments,
 		.protocol = u"tg"_q,
 		.protocolName = u"Telegram Link"_q,
-		.shortAppName = u"AyuGram"_q,
+		.shortAppName = u"FurryGram"_q,
 		.longAppName = QCoreApplication::applicationName(),
 		.displayAppName = AppName.utf16(),
 		.displayAppDescription = AppName.utf16(),

@@ -7,6 +7,122 @@
 add_executable(Telegram WIN32 MACOSX_BUNDLE)
 init_non_host_target(Telegram)
 
+# FurryGram: embed QuickJS (quickjs-ng) as a static lib for the user scripting engine.
+add_library(lib_quickjs STATIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/quickjs/dtoa.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/quickjs/libregexp.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/quickjs/libunicode.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/quickjs/quickjs.c
+)
+target_compile_definitions(lib_quickjs PRIVATE _GNU_SOURCE WIN32_LEAN_AND_MEAN _WIN32_WINNT=0x0601)
+target_include_directories(lib_quickjs PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/quickjs)
+set_target_properties(lib_quickjs PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED YES)
+if (MSVC)
+    target_compile_options(lib_quickjs PRIVATE /w) # silence third-party C warnings
+endif()
+
+# FurryGram: embed whisper.cpp (+ggml, CPU-only) for local voice transcription.
+set(WHISPER_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(WHISPER_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(WHISPER_BUILD_SERVER OFF CACHE BOOL "" FORCE)
+set(WHISPER_SDL2 OFF CACHE BOOL "" FORCE)
+set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
+# Build ggml/whisper statically (compiled into FurryGram.exe), not as separate
+# DLLs — avoids shipping/placing ggml*.dll next to the exe.
+set(GGML_BACKEND_DL OFF CACHE BOOL "" FORCE)
+set(GGML_STATIC ON CACHE BOOL "" FORCE)
+# whisper.cpp ships an old cmake_minimum_required; the very new CMake here treats
+# that (and the MSVC-ASM policy) as dev errors. Relax for the subproject.
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+set(CMAKE_WARN_DEPRECATED OFF CACHE BOOL "" FORCE)
+set(CMAKE_POLICY_DEFAULT_CMP0194 NEW)
+# Force static libs for the whisper subproject only, then restore.
+set(_FURRY_SHARED_SAVED "${BUILD_SHARED_LIBS}")
+set(BUILD_SHARED_LIBS OFF)
+add_subdirectory(ThirdParty/whisper EXCLUDE_FROM_ALL)
+set(BUILD_SHARED_LIBS "${_FURRY_SHARED_SAVED}")
+
+# FurryGram: CLIP (image + text encoders) for local semantic media search.
+# monatis/clip.cpp ported onto the bundled ggml (see ThirdParty/clip). Built as a
+# static lib that links the existing ggml targets above — we do NOT vendor a
+# second ggml. Needs C++20 (designated initializers) and Advapi32 on Windows
+# (ggml-cpu reads the registry for CPU info).
+add_library(clip STATIC
+    ThirdParty/clip/clip.cpp
+    ThirdParty/clip/clip.h
+)
+target_include_directories(clip
+PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/clip
+PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/whisper/ggml/include
+)
+target_link_libraries(clip PRIVATE ggml ggml-cpu ggml-base)
+target_compile_features(clip PRIVATE cxx_std_20)
+if (WIN32)
+    target_link_libraries(clip PRIVATE Advapi32)
+endif()
+
+# FurryGram: Tesseract OCR (+ Leptonica), CPU, static. We feed Tesseract
+# in-memory RGBA (a PIX built from a QImage), so Leptonica needs no image-format
+# libraries — disable zlib/png/jpeg/tiff/webp/openjpeg for a dependency-free build.
+set(_FURRY_OCR_SHARED_SAVED "${BUILD_SHARED_LIBS}")
+set(BUILD_SHARED_LIBS OFF)
+# Leptonica/Tesseract ship old cmake_minimum_required values that the very new
+# CMake here treats as deprecation *errors* (threshold 3.10). Relax for them.
+set(CMAKE_POLICY_VERSION_MINIMUM 3.16)
+set(BUILD_PROG OFF CACHE BOOL "" FORCE)
+set(SW_BUILD OFF CACHE BOOL "" FORCE)
+set(ENABLE_ZLIB OFF CACHE BOOL "" FORCE)
+set(ENABLE_PNG OFF CACHE BOOL "" FORCE)
+set(ENABLE_GIF OFF CACHE BOOL "" FORCE)
+set(ENABLE_JPEG OFF CACHE BOOL "" FORCE)
+set(ENABLE_TIFF OFF CACHE BOOL "" FORCE)
+set(ENABLE_WEBP OFF CACHE BOOL "" FORCE)
+set(ENABLE_OPENJPEG OFF CACHE BOOL "" FORCE)
+add_subdirectory(ThirdParty/leptonica EXCLUDE_FROM_ALL)
+
+# Tesseract includes Leptonica as <leptonica/allheaders.h>, but the in-tree
+# headers live directly in .../leptonica/src (no leptonica/ prefix). Expose them
+# under a leptonica/ prefix via a directory junction (no admin rights needed).
+set(_furry_lept_prefix "${CMAKE_CURRENT_BINARY_DIR}/furry_leptonica_include")
+if(NOT EXISTS "${_furry_lept_prefix}/leptonica")
+    file(MAKE_DIRECTORY "${_furry_lept_prefix}")
+    file(TO_NATIVE_PATH "${_furry_lept_prefix}/leptonica" _furry_link_native)
+    file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/leptonica/src" _furry_target_native)
+    execute_process(COMMAND cmd /c mklink /J "${_furry_link_native}" "${_furry_target_native}")
+endif()
+
+# Shim so Tesseract's find_package(Leptonica CONFIG) resolves to the in-tree
+# `leptonica` target (see ThirdParty/leptonica-shim/).
+set(FURRY_LEPTONICA_VERSION "1.85.0" CACHE INTERNAL "")
+set(FURRY_LEPTONICA_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/leptonica" CACHE INTERNAL "")
+set(FURRY_LEPTONICA_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/ThirdParty/leptonica" CACHE INTERNAL "")
+set(FURRY_LEPTONICA_PREFIX_DIR "${_furry_lept_prefix}" CACHE INTERNAL "")
+set(Leptonica_DIR "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/leptonica-shim" CACHE PATH "" FORCE)
+
+# Tesseract: LSTM-only OCR engine, no training tools / tests / extra deps.
+set(BUILD_TRAINING_TOOLS OFF CACHE BOOL "" FORCE)
+set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(DISABLE_TIFF ON CACHE BOOL "" FORCE)
+set(DISABLE_ARCHIVE ON CACHE BOOL "" FORCE)
+set(DISABLE_CURL ON CACHE BOOL "" FORCE)
+# NB: keep the legacy engine and ScrollView graphics ENABLED — Tesseract's
+# baseapi/control still reference their symbols (LearnWord, EquationDetect,
+# create_fx_win, os_detect_blobs, ...), so disabling them only breaks the final
+# exe link with unresolved externals. Runtime still uses the LSTM engine.
+set(DISABLED_LEGACY_ENGINE OFF CACHE BOOL "" FORCE)
+set(GRAPHICS_DISABLED OFF CACHE BOOL "" FORCE)
+set(OPENMP_BUILD OFF CACHE BOOL "" FORCE)
+set(USE_SYSTEM_ICU OFF CACHE BOOL "" FORCE)
+set(INSTALL_CONFIGS OFF CACHE BOOL "" FORCE)
+add_subdirectory(ThirdParty/tesseract EXCLUDE_FROM_ALL)
+# Expose Tesseract's generated public header (tesseract/version.h) to consumers —
+# its target only puts the source include/ on the INTERFACE, not the build dir.
+target_include_directories(libtesseract INTERFACE
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/ThirdParty/tesseract/include>")
+set(BUILD_SHARED_LIBS "${_FURRY_OCR_SHARED_SAVED}")
+
 add_subdirectory(lib_rpl)
 add_subdirectory(lib_crl)
 add_subdirectory(lib_base)
@@ -59,6 +175,10 @@ set_target_properties(Telegram PROPERTIES AUTOMOC ON)
 
 target_link_libraries(Telegram
 PRIVATE
+    lib_quickjs
+    whisper
+    clip
+    libtesseract
     tdesktop::lib_tgcalls
 
     # Order in this list defines the order of include paths in command line.
@@ -134,6 +254,10 @@ set(ayugram_files
         ayu/utils/taptic_engine/platform/taptic_engine_mac.h
         ayu/ui/ayu_logo.cpp
         ayu/ui/ayu_logo.h
+        ayu/scripting/furry_scripts.cpp
+        ayu/scripting/furry_scripts.h
+        ayu/ui/settings/settings_scripts.cpp
+        ayu/ui/settings/settings_scripts.h
         ayu/ui/toasts.cpp
         ayu/ui/toasts.h
         ayu/ui/ayu_userpic.cpp
@@ -160,6 +284,8 @@ set(ayugram_files
         ayu/ui/settings/settings_general.h
         ayu/ui/settings/settings_ayu.cpp
         ayu/ui/settings/settings_ayu.h
+        ayu/ui/settings/focus_exceptions_box.cpp
+        ayu/ui/settings/focus_exceptions_box.h
         ayu/ui/settings/settings_filters.cpp
         ayu/ui/settings/settings_filters.h
         ayu/ui/settings/settings_main.cpp
@@ -213,6 +339,31 @@ set(ayugram_files
         ayu/libs/sqlite/sqlite3.c
         ayu/libs/sqlite/sqlite3.h
         ayu/libs/sqlite/sqlite_orm.h
+        ayu/features/ghost_schedule.cpp
+        ayu/features/ghost_schedule.h
+        ayu/features/focus_mode.cpp
+        ayu/features/focus_mode.h
+        ayu/features/furry_stego.cpp
+        ayu/features/furry_stego.h
+        ayu/features/furry_lang.cpp
+        ayu/features/furry_lang.h
+        ayu/features/channel_search.cpp
+        ayu/features/channel_search.h
+        ayu/features/media_clip.cpp
+        ayu/features/media_clip.h
+        ayu/features/media_clip_download.cpp
+        ayu/features/media_clip_db.cpp
+        ayu/features/media_clip_db.h
+        ayu/features/media_clip_index.cpp
+        ayu/features/media_clip_index.h
+        ayu/features/media_clip_search.cpp
+        ayu/features/media_clip_search.h
+        ayu/features/voice_transcribe.cpp
+        ayu/features/voice_transcribe.h
+        ayu/features/ocr.cpp
+        ayu/features/ocr.h
+        ayu/features/ocr_ui.cpp
+        ayu/features/ocr_download.cpp
         ayu/features/streamer_mode/platform/streamer_mode_win.cpp
         ayu/features/streamer_mode/platform/streamer_mode_win.h
         ayu/features/streamer_mode/platform/streamer_mode_linux.cpp
@@ -1724,6 +1875,8 @@ PRIVATE
     platform/win/overlay_widget_win.h
     platform/win/specific_win.cpp
     platform/win/specific_win.h
+    platform/win/text_recognition_win.cpp
+    platform/win/text_recognition_win.h
     platform/win/translate_provider_win.h
     platform/win/tray_win.cpp
     platform/win/tray_win.h
@@ -2272,7 +2425,7 @@ else()
         set(bundle_identifier "one.ayugram.AyuGramDesktop")
     endif()
     set(bundle_entitlements "Telegram.entitlements")
-    set(output_name "AyuGram")
+    set(output_name "FurryGram")
 endif()
 
 if (CMAKE_GENERATOR STREQUAL Xcode)

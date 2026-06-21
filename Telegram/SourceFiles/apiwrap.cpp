@@ -84,6 +84,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/item_text_options.h"
 #include "ui/text/text_utilities.h"
 #include "ui/chat/attach/attach_prepare.h"
+#include "core/mime_type.h"
 #include "ui/toast/toast.h"
 #include "support/support_helper.h"
 #include "settings/sections/settings_premium.h"
@@ -3978,11 +3979,28 @@ void ApiWrap::sendFile(
 	const auto to = FileLoadTaskOptions(action);
 	auto caption = TextWithTags();
 	const auto spoiler = false;
+	// FurryGram: if the bytes are an image sent as a file, decode it so the
+	// resulting document carries a thumbnail preview in the chat bubble.
+	// The document content stays the original bytes (lossless), so e.g.
+	// steganographic payloads survive.
+	auto information = std::unique_ptr<Ui::PreparedFileInformation>();
+	if (!fileContent.isEmpty()) {
+		auto image = QImage::fromData(fileContent);
+		if (!image.isNull()) {
+			information = std::make_unique<Ui::PreparedFileInformation>();
+			information->filemime = Core::MimeTypeForData(fileContent).name();
+			information->media = Ui::PreparedFileInformation::Image{
+				.data = std::move(image),
+				.bytes = fileContent,
+				.format = "PNG",
+			};
+		}
+	}
 	_fileLoader->addTask(std::make_unique<FileLoadTask>(FileLoadTask::Args{
 		.session = &session(),
 		.filepath = QString(),
 		.content = fileContent,
-		.information = nullptr,
+		.information = std::move(information),
 		.videoCover = nullptr,
 		.type = type,
 		.to = to,

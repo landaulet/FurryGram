@@ -27,6 +27,8 @@
 #include "core/mime_type.h"
 #include "data/data_channel.h"
 #include "data/data_chat.h"
+#include "data/data_document_media.h"
+#include "data/data_media_types.h"
 #include "data/data_forum_topic.h"
 #include "data/data_search_controller.h"
 #include "data/data_session.h"
@@ -40,14 +42,134 @@
 #include "styles/style_layers.h"
 #include "styles/style_menu_icons.h"
 #include "ui/boxes/confirm_box.h"
+#include "ui/layers/generic_box.h"
+#include "ui/widgets/fields/input_field.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/widgets/menu/menu_add_action_callback_factory.h"
 #include "window/window_peer_menu.h"
 #include "window/window_session_controller.h"
+#include "ayu/features/furry_stego.h"
+#include "ayu/features/furry_lang.h"
+#include "ayu/features/media_clip_search.h"
+#include "api/api_common.h"
+#include "core/file_utilities.h"
+#include "storage/localimageloader.h"
+#include "styles/style_window.h"
+#include "ui/text/text_entity.h"
+
+#include <QtGui/QImage>
+#include <QtGui/QGuiApplication>
+#include <QtGui/QClipboard>
 
 namespace AyuUi {
 
 namespace {
+
+void ShowStegoSendBox(
+		not_null<Window::SessionController*> controller,
+		not_null<PeerData*> peer,
+		QImage image) {
+	controller->show(Box([=](not_null<Ui::GenericBox*> box) {
+		box->setTitle(rpl::single(QString("Hidden message")));
+		const auto field = box->addRow(object_ptr<Ui::InputField>(
+			box->verticalLayout(),
+			st::windowFilterNameInput,
+			Ui::InputField::Mode::MultiLine,
+			rpl::single(QString("Secret message"))));
+		const auto password = box->addRow(object_ptr<Ui::InputField>(
+			box->verticalLayout(),
+			st::windowFilterNameInput,
+			rpl::single(QString("Password (optional, for encryption)"))));
+		box->setFocusCallback([=] { field->setFocusFast(); });
+		const auto submit = [=] {
+			const auto text = field->getLastText().trimmed();
+			if (text.isEmpty()) {
+				field->showError();
+				return;
+			}
+			const auto bytes = FurryStego::Embed(
+				image,
+				text,
+				password->getLastText());
+			if (bytes.isEmpty()) {
+				controller->show(Ui::MakeInformBox(QString(
+					"This image is too small to hold the message.")));
+				return;
+			}
+			const auto history = peer->owner().history(peer);
+			peer->session().api().sendFile(
+				bytes,
+				SendMediaType::File,
+				Api::SendAction(history));
+			box->closeBox();
+		};
+		box->addButton(rpl::single(QString("Send")), submit);
+		box->addButton(rpl::single(QString("Cancel")), [=] {
+			box->closeBox();
+		});
+	}));
+}
+
+void ShowStegoSendFlow(
+		not_null<Window::SessionController*> controller,
+		not_null<PeerData*> peer) {
+	auto callback = [=](FileDialog::OpenResult &&result) {
+		if (result.paths.isEmpty()) {
+			return;
+		}
+		auto image = QImage(result.paths.front());
+		if (image.isNull()) {
+			controller->show(Ui::MakeInformBox(QString(
+				"Couldn't load this image.")));
+			return;
+		}
+		ShowStegoSendBox(controller, peer, std::move(image));
+	};
+	const auto parent = static_cast<QWidget*>(controller->content().get());
+	FileDialog::GetOpenPath(
+		parent,
+		"Choose an image to hide a message in",
+		"Images (*.png *.jpg *.jpeg *.bmp *.webp)",
+		crl::guard(controller, std::move(callback)));
+}
+
+void RevealStego(
+		not_null<Window::SessionController*> controller,
+		QImage image,
+		const QString &password) {
+	const auto result = FurryStego::Extract(image, password);
+	if (result.ok) {
+		controller->show(Ui::MakeInformBox(result.message));
+		return;
+	}
+	if (!result.present) {
+		controller->show(Ui::MakeInformBox(QString(
+			"No hidden message found in this image.")));
+		return;
+	}
+	// Present but not decrypted yet => ask for a password.
+	controller->show(Box([=](not_null<Ui::GenericBox*> box) {
+		box->setTitle(rpl::single(QString("Hidden message")));
+		const auto field = box->addRow(object_ptr<Ui::InputField>(
+			box->verticalLayout(),
+			st::windowFilterNameInput,
+			rpl::single(QString("Password"))));
+		box->setFocusCallback([=] { field->setFocusFast(); });
+		const auto submit = [=] {
+			const auto again = FurryStego::Extract(image, field->getLastText());
+			if (again.ok) {
+				box->closeBox();
+				controller->show(Ui::MakeInformBox(again.message));
+			} else {
+				field->showError();
+			}
+		};
+		box->addButton(rpl::single(QString("Reveal")), submit);
+		box->addButton(rpl::single(QString("Cancel")), [=] {
+			box->closeBox();
+		});
+	}));
+}
 
 Fn<void()> ClearDeletedMessagesHandler(not_null<Window::SessionController*> controller, not_null<PeerData*> peer, ID topicId) {
 	return [=] {
@@ -217,12 +339,85 @@ bool needToShowItem(ContextMenuVisibility state) {
 		|| (state == ContextMenuVisibility::VisibleWithModifier && base::IsExtendedContextMenuModifierPressed());
 }
 
+void AddRevealHiddenMessageAction(
+		not_null<Ui::PopupMenu*> menu,
+		DocumentData *document,
+		not_null<Window::SessionController*> controller) {
+	if (!document) {
+		return;
+	}
+	// Only show the action for already-available images that actually carry a
+	// hidden payload — so it doesn't appear on every picture.
+	auto image = QImage();
+	const auto path = document->filepath(true);
+	if (!path.isEmpty()) {
+		image = QImage(path);
+	}
+	if (image.isNull()) {
+		const auto view = document->createMediaView();
+		const auto bytes = view->loaded() ? view->bytes() : QByteArray();
+		if (!bytes.isEmpty()) {
+			image = QImage::fromData(bytes);
+		}
+	}
+	if (image.isNull() || !FurryStego::HasPayload(image)) {
+		return;
+	}
+	menu->addAction(QString("Reveal hidden message"), [=] {
+		RevealStego(controller, image, QString());
+	}, &st::menuIconFurryReveal);
+}
+
 void AddAyuGramActions(PeerData *peerData,
 							   Data::Thread *thread,
 							   not_null<Window::SessionController*> sessionController,
 							   const Window::PeerMenuCallback &addCallback) {
 	if (!peerData) {
 		return;
+	}
+
+	// FurryGram: send an image with a hidden (steganographic) message.
+	{
+		const auto peer = not_null<PeerData*>(peerData);
+		addCallback(Window::PeerMenuCallback::Args{
+			.text = QString("Hidden message"),
+			.handler = [=] { ShowStegoSendFlow(sessionController, peer); },
+			.icon = &st::menuIconEdit,
+		});
+	}
+
+	// FurryGram: offline semantic image search over this chat's cached photos.
+	{
+		const auto peer = not_null<PeerData*>(peerData);
+		addCallback(Window::PeerMenuCallback::Args{
+			.text = FurryLang::Pick(
+				u"Search images by text"_q,
+				QString::fromUtf8("\xd0\x9f\xd0\xbe\xd0\xb8\xd1\x81\xd0\xba\x20\xd0\xba\xd0\xb0\xd1\x80\xd1\x82\xd0\xb8\xd0\xbd\xd0\xbe\xd0\xba\x20\xd0\xbf\xd0\xbe\x20\xd1\x82\xd0\xb5\xd0\xba\xd1\x81\xd1\x82\xd1\x83")),
+			.handler = [=] {
+				Ayu::ClipSearch::ShowSearchBox(sessionController, peer);
+			},
+			.icon = &st::menuIconStats,
+		});
+	}
+
+	// FurryGram: per-chat "always notify in Focus" exception.
+	{
+		const auto peer = not_null<PeerData*>(peerData);
+		const auto peerId = qint64(peer->id.value);
+		const auto has = AyuSettings::getInstance().hasFocusException(peerId);
+		addCallback(Window::PeerMenuCallback::Args{
+			.text = has
+				? FurryLang::Pick(
+					u"Don't force-notify in Focus"_q,
+					QString::fromUtf8("\xD0\x9D\xD0\xB5\x20\xD1\x83\xD0\xB2\xD0\xB5\xD0\xB4\xD0\xBE\xD0\xBC\xD0\xBB\xD1\x8F\xD1\x82\xD1\x8C\x20\xD0\xBF\xD1\x80\xD0\xB8\xD0\xBD\xD1\x83\xD0\xB4\xD0\xB8\xD1\x82\xD0\xB5\xD0\xBB\xD1\x8C\xD0\xBD\xD0\xBE\x20\xD0\xB2\x20\xD1\x84\xD0\xBE\xD0\xBA\xD1\x83\xD1\x81\xD0\xB5"))
+				: FurryLang::Pick(
+					u"Always notify in Focus"_q,
+					QString::fromUtf8("\xD0\x92\xD1\x81\xD0\xB5\xD0\xB3\xD0\xB4\xD0\xB0\x20\xD1\x83\xD0\xB2\xD0\xB5\xD0\xB4\xD0\xBE\xD0\xBC\xD0\xBB\xD1\x8F\xD1\x82\xD1\x8C\x20\xD0\xB2\x20\xD1\x84\xD0\xBE\xD0\xBA\xD1\x83\xD1\x81\xD0\xB5")),
+			.handler = [=] {
+				AyuSettings::getInstance().setFocusException(peerId, !has);
+			},
+			.icon = has ? &st::menuIconUnmute : &st::menuIconMute,
+		});
 	}
 
 	const auto &settings = AyuSettings::getInstance();
@@ -238,7 +433,7 @@ void AddAyuGramActions(PeerData *peerData,
 	const auto topicId = topic ? topic->rootId().bare : 0;
 
 	addCallback(Window::PeerMenuCallback::Args{
-		.text = u"AyuGram"_q,
+		.text = u"FurryGram"_q,
 		.handler = nullptr,
 		.icon = &st::menuIconGroupReactions,
 		.fillSubmenu = [=](not_null<Ui::PopupMenu*> menu) {
@@ -753,6 +948,93 @@ void AddMessageDetailsAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 			}
 		},
 	});
+}
+
+[[nodiscard]] static QString MessageToMarkdown(const TextWithEntities &value) {
+	struct Marker {
+		int pos = 0;
+		bool open = false;
+		QString text;
+	};
+	const auto size = int(value.text.size());
+	auto markers = std::vector<Marker>();
+	const auto add = [&](
+			int from,
+			int length,
+			const QString &openText,
+			const QString &closeText) {
+		if (length <= 0 || from < 0 || from + length > size) {
+			return;
+		}
+		markers.push_back({ from, true, openText });
+		markers.push_back({ from + length, false, closeText });
+	};
+	for (const auto &entity : value.entities) {
+		const auto from = entity.offset();
+		const auto length = entity.length();
+		switch (entity.type()) {
+		case EntityType::Bold:
+			add(from, length, u"**"_q, u"**"_q);
+			break;
+		case EntityType::Italic:
+			add(from, length, u"__"_q, u"__"_q);
+			break;
+		case EntityType::StrikeOut:
+			add(from, length, u"~~"_q, u"~~"_q);
+			break;
+		case EntityType::Spoiler:
+			add(from, length, u"||"_q, u"||"_q);
+			break;
+		case EntityType::Code:
+			add(from, length, u"`"_q, u"`"_q);
+			break;
+		case EntityType::Pre:
+			add(from, length, u"```\n"_q, u"\n```"_q);
+			break;
+		case EntityType::CustomUrl:
+			add(from, length, u"["_q, u"]("_q + entity.data() + u")"_q);
+			break;
+		default:
+			break;
+		}
+	}
+	std::stable_sort(markers.begin(), markers.end(), [](
+			const Marker &a,
+			const Marker &b) {
+		if (a.pos != b.pos) {
+			return a.pos < b.pos;
+		}
+		return (!a.open && b.open); // close markers before open markers
+	});
+	auto result = QString();
+	auto next = markers.begin();
+	for (auto i = 0; i <= size; ++i) {
+		for (; next != markers.end() && next->pos == i; ++next) {
+			result += next->text;
+		}
+		if (i < size) {
+			result += value.text.at(i);
+		}
+	}
+	return result;
+}
+
+void AddCopyAsMarkdownAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
+	if (!item) {
+		return;
+	}
+	const auto text = item->originalText();
+	if (text.text.isEmpty()) {
+		return;
+	}
+	menu->addAction(
+		FurryLang::Pick(
+			u"Copy as Markdown"_q,
+			QString::fromUtf8("\xd0\x9a\xd0\xbe\xd0\xbf\xd0\xb8\xd1\x80\xd0\xbe\xd0\xb2\xd0\xb0\xd1\x82\xd1\x8c\x20\xd0\xba\xd0\xb0\xd0\xba\x20\x4d\x61\x72\x6b\x64\x6f\x77\x6e")),
+		[=] {
+			QGuiApplication::clipboard()->setText(MessageToMarkdown(text));
+		},
+		&st::menuIconCopy);
 }
 
 void AddRepeatMessageAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item, HistoryView::Context context) {

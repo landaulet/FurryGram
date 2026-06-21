@@ -19,7 +19,14 @@ enum class EmbeddedType {
 	Default,
 	Night,
 	NightGreen,
+	FurryAero,
+	FurryViolet,
+	FurrySunset,
+	FurryForest,
 };
+
+// FurryGram custom themes are grouped into their own UI section.
+[[nodiscard]] bool IsFurryTheme(EmbeddedType type);
 
 struct EmbeddedScheme {
 	EmbeddedType type = EmbeddedType();

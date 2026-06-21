@@ -216,7 +216,7 @@ public:
 		int shift,
 		Direction shiftDirection);
 
-	void startHiding();
+	void startHiding(bool fast = false);
 	void stopHiding();
 
 	void updateNotifyDisplay();
@@ -307,6 +307,7 @@ private:
 	bool _waitingForInput = true;
 
 	QTimer _hideTimer;
+	Ui::Animations::Basic _hideProgress; // drives the auto-dismiss bar
 
 	int _replyPadding = 0;
 

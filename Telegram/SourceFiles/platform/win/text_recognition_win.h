@@ -7,18 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "platform/platform_text_recognition.h"
-
-namespace Platform {
-namespace TextRecognition {
-
-inline bool IsAvailable() {
-	return false;
-}
-
-inline Result RecognizeText(const QImage &image) {
-	return {};
-}
-
-} // namespace TextRecognition
-} // namespace Platform
+// FurryGram: Windows text recognition is implemented out-of-line in
+// text_recognition_win.cpp using the vendored Tesseract engine. The
+// IsAvailable()/RecognizeText() declarations live in
+// platform/platform_text_recognition.h (included before this header).

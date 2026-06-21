@@ -9,6 +9,8 @@
 #include "ayu/ayu_settings.h"
 #include "ayu/utils/telegram_helpers.h"
 #include "data/data_peer.h"
+#include "data/data_user.h"
+#include "base/flat_map.h"
 #include "lang/lang_text_entity.h"
 
 constexpr auto kMaxChannelId = -1000000000000;
@@ -48,4 +50,33 @@ rpl::producer<TextWithEntities> IDValue(MsgId topicRootId) {
 			? TextWithEntities()
 			: tr::marked(IDString(topicRootId));
 	});
+}
+
+rpl::producer<TextWithEntities> RegistrationDateValue(not_null<UserData*> user) {
+	// Per-user variable kept for the app lifetime, so the async fetch can update
+	// it safely even if the profile widget that subscribed is already gone.
+	static auto cache = base::flat_map<
+		ID,
+		std::unique_ptr<rpl::variable<TextWithEntities>>>();
+	const auto wrap = [](const QString &s) {
+		return s.isEmpty() ? TextWithEntities() : TextWithEntities{ s };
+	};
+	const auto id = getBareID(user);
+	auto it = cache.find(id);
+	if (it == cache.end()) {
+		it = cache.emplace(
+			id,
+			std::make_unique<rpl::variable<TextWithEntities>>()).first;
+		const auto raw = it->second.get();
+		if (const auto cached = getCachedRegistrationDate(id)) {
+			*raw = wrap(*cached);
+		} else {
+			getRegistrationDate(user, [=](TextWithEntities) {
+				if (const auto now = getCachedRegistrationDate(id)) {
+					*raw = wrap(*now);
+				}
+			});
+		}
+	}
+	return it->second->value();
 }

@@ -9,6 +9,7 @@
 #include "lang_auto.h"
 #include "ayu/ayu_settings.h"
 #include "ayu/ayu_ui_settings.h"
+#include "ayu/features/furry_lang.h"
 #include "ayu/ui/boxes/font_selector.h"
 #include "ayu/ui/components/avatar_corners_preview.h"
 #include "ayu/ui/components/icon_picker.h"
@@ -191,6 +192,13 @@ void BuildAppearance(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 	builder.addSubsectionTitle(tr::ayu_CategoryAppearance());
 
 	ayu.addSettingToggle({
+		.id = u"furry/mascotIntro"_q,
+		.title = rpl::single(QString("Mascot Intro")),
+		.getter = &AyuSettings::mascotIntro,
+		.setter = &AyuSettings::setMascotIntro,
+	});
+
+	ayu.addSettingToggle({
 		.id = u"ayu/materialSwitches"_q,
 		.altIds = { u"ayu/newSwitchStyle"_q },
 		.title = tr::ayu_MaterialSwitches(),
@@ -332,6 +340,16 @@ void BuildDrawerElements(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 		.getter = &AyuSettings::showSavedMessagesInDrawer,
 		.setter = &AyuSettings::setShowSavedMessagesInDrawer,
 		.icon = { &st::menuIconSavedMessages },
+	});
+	ayu.addSettingToggle({
+		.id = u"furry/showChannelSearchInDrawer"_q,
+		.title = rpl::single(FurryLang::Pick(
+			u"Find channels"_q,
+			// "Найти каналы"
+			QString::fromUtf8("\xD0\x9D\xD0\xB0\xD0\xB9\xD1\x82\xD0\xB8\x20\xD0\xBA\xD0\xB0\xD0\xBD\xD0\xB0\xD0\xBB\xD1\x8B"))),
+		.getter = &AyuSettings::showChannelSearchInDrawer,
+		.setter = &AyuSettings::setShowChannelSearchInDrawer,
+		.icon = { &st::menuIconChannel },
 	});
 	ayu.addSettingToggle({
 		.id = u"ayu/showLReadToggleInDrawer"_q,

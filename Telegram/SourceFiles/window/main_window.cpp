@@ -21,6 +21,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_account.h" // Account::sessionValue.
 #include "main/main_domain.h"
 #include "core/application.h"
+#include "ayu/ayu_settings.h"
 #include "core/sandbox.h"
 #include "core/shortcuts.h"
 #include "lang/lang_keys.h"
@@ -37,6 +38,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/controls/window_outdated_bar.h"
 #include "ui/controls/window_screen_reader_bar.h"
 #include "ui/painter.h"
+#include "ui/rp_widget.h"
+#include "ui/effects/animations.h"
+#include "base/timer.h"
+#include "base/call_delayed.h"
 #include "ui/screen_reader_mode.h"
 #include "ui/ui_utility.h"
 #include "apiwrap.h"
@@ -78,6 +83,128 @@ using Core::WindowPosition;
 [[nodiscard]] QImage &OverridenIcon() {
 	static auto result = QImage();
 	return result;
+}
+
+// FurryGram: startup splash — mascot zooms in over a dimmed UI, then evaporates.
+constexpr auto kSplashDurationMs = 2200;
+constexpr auto kSplashAppearPart = 0.30; // zoom-in part of the timeline
+constexpr auto kSplashHoldPart = 0.52;   // full-visible part end
+
+class FurrySplashOverlay final : public Ui::RpWidget {
+public:
+	explicit FurrySplashOverlay(not_null<Ui::RpWidget*> parent);
+
+private:
+	void paintEvent(QPaintEvent *e) override;
+
+	QImage _mascot;
+	crl::time _started = 0;
+	base::Timer _ticker;
+	bool _finished = false;
+
+};
+
+FurrySplashOverlay::FurrySplashOverlay(not_null<Ui::RpWidget*> parent)
+: Ui::RpWidget(parent)
+, _mascot(u":/gui/furrygram-mascot.png"_q) {
+	setAttribute(Qt::WA_TransparentForMouseEvents);
+	parent->sizeValue() | rpl::on_next([=](QSize size) {
+		setGeometry(QRect(QPoint(), size));
+	}, lifetime());
+	show();
+	raise();
+
+	// Drive the animation off the wall clock, not Ui::Animations: at startup the
+	// animation manager may not tick (busy event loop / anim disabled), which made
+	// the splash pop in and out without the zoom/fade. A real-time ticker is robust.
+	_started = crl::now();
+	_ticker.setCallback([=] {
+		update();
+		if (!_finished && (crl::now() - _started) >= kSplashDurationMs) {
+			_finished = true;
+			_ticker.cancel();
+			deleteLater();
+		}
+	});
+	_ticker.callEach(crl::time(15));
+}
+
+void FurrySplashOverlay::paintEvent(QPaintEvent *e) {
+	if (_mascot.isNull()) {
+		return;
+	}
+	auto p = QPainter(this);
+	p.setRenderHint(QPainter::SmoothPixmapTransform);
+
+	const auto elapsed = crl::now() - _started;
+	const auto progress = std::clamp(
+		double(elapsed) / kSplashDurationMs,
+		0.,
+		1.);
+	auto opacity = 1.;
+	auto scale = 1.;
+	auto dim = 1.;
+	auto drift = 0.;
+	if (progress < kSplashAppearPart) {
+		const auto t = anim::easeOutCubic(1., progress / kSplashAppearPart);
+		opacity = t;
+		scale = 0.84 + 0.16 * t;
+		dim = t;
+	} else if (progress < kSplashHoldPart) {
+		// fully shown
+	} else {
+		const auto e = anim::easeInCubic(
+			1.,
+			(progress - kSplashHoldPart) / (1. - kSplashHoldPart));
+		opacity = 1. - e;
+		scale = 1.0 - 0.32 * e; // recede backwards (shrink into the distance)
+		dim = 1. - e;
+		drift = 0.;
+	}
+
+	// Dimmed veil over the UI (fades in with the mascot, out as it evaporates).
+	p.fillRect(rect(), QColor(0, 0, 0, int(std::clamp(dim, 0., 1.) * 140)));
+
+	// Mascot, centered, sized to a fraction of the window height.
+	const auto baseH = std::min(height() * 0.46, double(_mascot.height()));
+	const auto baseW = baseH * _mascot.width() / _mascot.height();
+	const auto w = baseW * scale;
+	const auto h = baseH * scale;
+	const auto target = QRectF(
+		(width() - w) / 2.,
+		(height() - h) / 2. + drift,
+		w,
+		h);
+	p.setOpacity(std::clamp(opacity, 0., 1.));
+	p.drawImage(target, _mascot);
+}
+
+void ShowFurrySplash(not_null<Ui::RpWidget*> parent) {
+	new FurrySplashOverlay(parent); // self-deletes when the animation finishes
+}
+
+// Telegram's startup is full of synchronous freezes; starting the splash during
+// one makes it stutter. So we wait for the event loop to become responsive:
+// probe with short delayed calls and only show the splash once a probe fires
+// roughly on schedule (loop idle), capped by a safety timeout.
+void ShowFurrySplashWhenIdle(not_null<Ui::RpWidget*> parent) {
+	const auto started = std::make_shared<crl::time>(crl::now());
+	const auto expected = std::make_shared<crl::time>(0);
+	const auto probe = std::make_shared<Fn<void()>>();
+	const auto schedule = [=] {
+		*expected = crl::now() + 60;
+		base::call_delayed(60, parent, [=] { (*probe)(); });
+	};
+	*probe = [=] {
+		const auto late = crl::now() - *expected;
+		const auto waited = crl::now() - *started;
+		if (late <= 45 || waited >= 4000) {
+			ShowFurrySplash(parent);
+		} else {
+			schedule();
+		}
+	};
+	schedule();
 }
 
 base::options::toggle OptionNewWindowsSizeAsFirst({
@@ -398,6 +525,12 @@ MainWindow::MainWindow(not_null<Controller*> controller)
 		updateTitle();
 		unreadCounterChangedHook();
 		Core::App().tray().updateIconCounters();
+	}, lifetime());
+
+	// FurryGram: refresh the window title (ghost 👻 prefix) when ghost toggles.
+	AyuSettings::ghost().ghostModeActiveChanges(
+	) | rpl::on_next([=] {
+		updateTitle();
 	}, lifetime());
 
 	Core::App().settings().workModeChanges(
@@ -753,16 +886,24 @@ void MainWindow::firstShow() {
 	updateMinimumSize();
 	if (initGeometryFromSystem()) {
 		show();
-		return;
+	} else {
+		const auto geometry = countInitialGeometry(initialPosition());
+		DEBUG_LOG(("Window Pos: Setting first %1, %2, %3, %4"
+			).arg(geometry.x()
+			).arg(geometry.y()
+			).arg(geometry.width()
+			).arg(geometry.height()));
+		setGeometry(geometry);
+		show();
 	}
-	const auto geometry = countInitialGeometry(initialPosition());
-	DEBUG_LOG(("Window Pos: Setting first %1, %2, %3, %4"
-		).arg(geometry.x()
-		).arg(geometry.y()
-		).arg(geometry.width()
-		).arg(geometry.height()));
-	setGeometry(geometry);
-	show();
+	// FurryGram: show the mascot splash once, on the first window appearance.
+	static auto splashShown = false;
+	if (!splashShown) {
+		splashShown = true;
+		if (AyuSettings::getInstance().mascotIntro()) {
+			ShowFurrySplashWhenIdle(body());
+		}
+	}
 }
 
 void MainWindow::positionUpdated() {
@@ -821,6 +962,11 @@ void MainWindow::updateTitle() {
 		return;
 	}
 
+	// FurryGram: ghost-mode indicator prefix in the window title.
+	const auto ghost = AyuSettings::ghost().isGhostModeActive()
+		? u"\U0001F47B "_q // 👻
+		: QString();
+
 	const auto settings = Core::App().settings().windowTitleContent();
 	const auto locked = Core::App().passcodeLocked();
 	const auto counter = settings.hideTotalUnread
@@ -837,7 +983,7 @@ void MainWindow::updateTitle() {
 		? TitleFromSeparateSharedMedia(settings, session->windowId())
 		: QString();
 	if (!separateSharedMediaTitle.isEmpty()) {
-		setTitle(separateSharedMediaTitle);
+		setTitle(ghost + separateSharedMediaTitle);
 		return;
 	}
 	const auto key = (session && !settings.hideChatName)
@@ -845,7 +991,7 @@ void MainWindow::updateTitle() {
 		: Dialogs::Key();
 	const auto thread = key ? key.thread() : nullptr;
 	if (!thread) {
-		setTitle((user.isEmpty() ? u"AyuGram"_q : user) + added);
+		setTitle(ghost + (user.isEmpty() ? u"FurryGram"_q : user) + added);
 		return;
 	}
 	const auto history = thread->owningHistory();
@@ -865,7 +1011,7 @@ void MainWindow::updateTitle() {
 		: !added.isEmpty()
 		? u" \u2013"_q
 		: QString();
-	setTitle(primary + middle + added);
+	setTitle(ghost + primary + middle + added);
 }
 
 QRect MainWindow::computeDesktopRect() const {

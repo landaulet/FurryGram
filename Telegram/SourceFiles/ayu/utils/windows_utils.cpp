@@ -14,6 +14,7 @@
 
 #include <propvarutil.h>
 #include <ShlObj_core.h>
+#include <QtWidgets/QWidget>
 
 void processIcon(QString shortcut, QString iconPath) {
 	if (!QFile::exists(shortcut)) {
@@ -154,6 +155,18 @@ void processNewShortcuts(const QString &iconPath) {
 
 		processIcon(QString::fromStdWString(native), iconPath);
 	}
+}
+
+void setWindowExcludeFromCapture(QWidget *widget, bool exclude) {
+	if (!widget) {
+		return;
+	}
+	const auto handle = reinterpret_cast<HWND>(widget->winId());
+	if (!handle) {
+		return;
+	}
+	// 0x11 = WDA_EXCLUDEFROMCAPTURE (Win10 2004+), 0 = WDA_NONE.
+	SetWindowDisplayAffinity(handle, exclude ? DWORD(0x11) : DWORD(0));
 }
 
 void reloadAppIconFromTaskBar() {

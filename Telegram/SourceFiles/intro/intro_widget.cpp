@@ -1,4 +1,4 @@
-/*
+﻿/*
 This file is part of Telegram Desktop,
 the official desktop application for the Telegram messaging service.
 
@@ -172,7 +172,9 @@ Widget::Widget(
 		}, lifetime());
 	}
 
-	_footer->setText(QString("AyuGram Desktop v%1").arg(currentVersionText()));
+	_footer->setText(
+		QString("FurryGram Desktop v%1\nmade with paws  =^.^=")
+			.arg(currentVersionText()));
 }
 
 rpl::producer<> Widget::showSettingsRequested() const {

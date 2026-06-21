@@ -120,6 +120,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ayu_state.h"
+#include "ayu/features/ocr.h" // FurryGram: local OCR.
 #include "ayu/features/streamer_mode/streamer_mode.h"
 
 
@@ -2035,6 +2036,32 @@ void OverlayWidget::fillContextMenuActions(
 			tr::lng_context_attached_stickers(tr::now),
 			[=] { showAttachedStickers(); },
 			&st::mediaMenuIconStickers);
+	}
+	// FurryGram: offline OCR of the current photo -> copyable text box.
+	if (_photo
+		&& _photoMedia
+		&& _photoMedia->loaded()
+		&& Platform::TextRecognition::IsAvailable()) {
+		addAction(QString("Recognize text (OCR)"), [=] {
+			const auto image = _photoMedia->image(Data::PhotoSize::Large);
+			if (!image) {
+				return;
+			}
+			auto bytes = image->original();
+			const auto show = uiShow();
+			const auto guard = base::make_weak(_widget);
+			crl::async([=, img = std::move(bytes)]() mutable {
+				auto result = Platform::TextRecognition::RecognizeText(img);
+				auto lines = QStringList();
+				for (const auto &item : result.items) {
+					lines.push_back(item.text);
+				}
+				const auto joined = lines.join('\n');
+				crl::on_main(guard, [=] {
+					Ayu::Ocr::ShowResultBox(show, joined);
+				});
+			});
+		}, &st::mediaMenuIconCopy);
 	}
 	if (_message && _message->allowsForward()) {
 		addAction(

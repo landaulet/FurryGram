@@ -1,4 +1,4 @@
-// This is the source code of AyuGram for Desktop.
+﻿// This is the source code of AyuGram for Desktop.
 //
 // We do not and cannot prevent the use of our code,
 // but be respectful and credit the original author.
@@ -16,6 +16,7 @@
 #include "ayu/ui/settings/settings_filters.h"
 #include "ayu/ui/settings/settings_general.h"
 #include "ayu/ui/settings/settings_other.h"
+#include "ayu/ui/settings/settings_scripts.h"
 #include "core/version.h"
 #include "settings/settings_builder.h"
 #include "settings/settings_common.h"
@@ -70,7 +71,7 @@ void BuildVersionInfo(SectionBuilder &builder) {
 			.widget = object_ptr<Ui::FlatLabel>(
 				ctx.container,
 				rpl::single(
-					QString("AyuGram Desktop v")
+					QString("FurryGram Desktop v")
 					+ QString::fromLatin1(AppVersionStr)),
 				st::boxTitle),
 			.align = style::al_top,
@@ -101,9 +102,14 @@ void BuildCategories(SectionBuilder &builder) {
 	builder.addSubsectionTitle(tr::ayu_CategoriesHeader());
 
 	builder.addSectionButton({
-		.title = rpl::single(QString("AyuGram")),
+		.title = rpl::single(QString("FurryGram")),
 		.targetSection = AyuGhost::Id(),
 		.icon = { &st::menuIconGroupReactions },
+	});
+	builder.addSectionButton({
+		.title = rpl::single(QString("Scripts")),
+		.targetSection = AyuScripts::Id(),
+		.icon = { &st::menuIconEdit },
 	});
 	builder.addSectionButton({
 		.title = tr::ayu_CategoryFilters(),

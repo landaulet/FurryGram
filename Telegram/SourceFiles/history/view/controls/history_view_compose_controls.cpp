@@ -4641,23 +4641,30 @@ TextWithEntities ComposeControls::prepareTextForEditMsg() const {
 }
 
 void ComposeControls::checkCharsLimitation() {
-	if (!_history || !isEditingMessage()) {
+	if (!_history) {
 		_charsLimitation = nullptr;
 		return;
 	}
-	const auto item = _history->owner().message(_header->editMsgId());
-	if (!item) {
+	const auto editing = isEditingMessage();
+	const auto item = editing
+		? _history->owner().message(_header->editMsgId())
+		: nullptr;
+	if (editing && !item) {
 		_charsLimitation = nullptr;
 		return;
 	}
-	const auto hasMediaWithCaption = item->media()
+	const auto hasMediaWithCaption = item
+		&& item->media()
 		&& item->media()->allowsEditCaption();
 	const auto maxCaptionSize = !hasMediaWithCaption
 		? MaxMessageSize
 		: Data::PremiumLimits(&session()).captionLengthCurrent();
-	const auto remove = Ui::ComputeFieldCharacterCount(_field)
-		- maxCaptionSize;
-	if (remove > 0) {
+	const auto count = Ui::ComputeFieldCharacterCount(_field);
+	const auto remove = count - maxCaptionSize;
+	// FurryGram: a live character counter — show how many characters are left
+	// once a message gets long (the over-limit warning still shows in red).
+	constexpr auto kShowCounterFrom = 1000;
+	if (remove > 0 || count >= kShowCounterFrom) {
 		if (!_charsLimitation) {
 			using namespace Controls;
 			_charsLimitation = base::make_unique_q<CharactersLimitLabel>(

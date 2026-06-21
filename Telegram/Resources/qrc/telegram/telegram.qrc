@@ -13,6 +13,12 @@
     <file alias="day-blue.tdesktop-theme">../../day-blue.tdesktop-theme</file>
     <file alias="night.tdesktop-theme">../../night.tdesktop-theme</file>
     <file alias="night-green.tdesktop-theme">../../night-green.tdesktop-theme</file>
+    <file alias="furrygram-tray.png">../../furrygram-tray.png</file>
+    <file alias="furrygram-mascot.png">../../furrygram-mascot.png</file>
+    <file alias="furrygram-aero.tdesktop-theme">../../furrygram-aero.tdesktop-theme</file>
+    <file alias="furrygram-violet.tdesktop-theme">../../furrygram-violet.tdesktop-theme</file>
+    <file alias="furrygram-sunset.tdesktop-theme">../../furrygram-sunset.tdesktop-theme</file>
+    <file alias="furrygram-forest.tdesktop-theme">../../furrygram-forest.tdesktop-theme</file>
     <file alias="day-custom-base.tdesktop-theme">../../day-custom-base.tdesktop-theme</file>
     <file alias="night-custom-base.tdesktop-theme">../../night-custom-base.tdesktop-theme</file>
     <file alias="icons/calls/hands.lottie">../../icons/calls/hands.lottie</file>

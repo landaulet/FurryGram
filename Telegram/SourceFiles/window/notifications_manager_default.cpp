@@ -1,4 +1,4 @@
-/*
+﻿/*
 This file is part of Telegram Desktop,
 the official desktop application for the Telegram messaging service.
 
@@ -10,6 +10,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "platform/platform_notifications_manager.h"
 #include "platform/platform_specific.h"
 #include "core/application.h"
+#include "ayu/ayu_settings.h"
+#ifdef Q_OS_WIN
+#include "ayu/utils/windows_utils.h"
+#endif
 #include "core/ui_integration.h"
 #include "chat_helpers/message_field.h"
 #include "lang/lang_keys.h"
@@ -21,6 +25,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/emoji_config.h"
 #include "ui/empty_userpic.h"
 #include "ui/painter.h"
+#include "ui/image/image_prepare.h"
 #include "ui/power_saving.h"
 #include "ui/ui_utility.h"
 #include "data/data_saved_sublist.h"
@@ -515,11 +520,27 @@ Widget::Widget(
 		| Qt::NoDropShadowWindowHint
 		| Qt::Tool);
 	setAttribute(Qt::WA_MacAlwaysShowToolWindow);
-	setAttribute(Qt::WA_OpaquePaintEvent);
+	// FurryGram: translucent so the notification card can have rounded corners.
+	setAttribute(Qt::WA_TranslucentBackground);
 
 	Ui::Platform::InitOnTopPanel(this);
 
 	_a_opacity.start([this] { opacityAnimationCallback(); }, 0., 1., st::notifyFastAnim);
+
+#ifdef Q_OS_WIN
+	// FurryGram: anti-screenshare must also cover notification popups (separate
+	// top-level windows) — otherwise they stay visible during screen sharing.
+	const auto applyAntiScreenshare = [=] {
+		setWindowExcludeFromCapture(
+			this,
+			AyuSettings::getInstance().antiScreenshare());
+	};
+	applyAntiScreenshare();
+	AyuSettings::getInstance().antiScreenshareChanges(
+	) | rpl::on_next([=](bool) {
+		applyAntiScreenshare();
+	}, lifetime());
+#endif
 }
 
 void Widget::opacityAnimationCallback() {
@@ -697,7 +718,13 @@ Notification::Notification(
 	updateNotifyDisplay();
 
 	_hideTimer.setSingleShot(true);
-	connect(&_hideTimer, &QTimer::timeout, [=] { startHiding(); });
+	connect(&_hideTimer, &QTimer::timeout, [=] { startHiding(true); });
+
+	// FurryGram: repaint each frame so the auto-dismiss bar animates.
+	_hideProgress.init([=](crl::time) {
+		update();
+		return true;
+	});
 
 	_close->setClickedCallback([this] {
 		unlinkHistoryInManager();
@@ -778,6 +805,7 @@ bool Notification::checkLastInput(
 		_waitingForInput = false;
 		if (!hasReplyingNotifications) {
 			_hideTimer.start(st::notifyWaitLongHide);
+			_hideProgress.start();
 		}
 		return true;
 	}
@@ -817,6 +845,30 @@ void Notification::paintEvent(QPaintEvent *e) {
 		p.drawPixmapRight(st::notifyBorderWidth, buttonsTop, width(), _buttonsCache);
 	} else if (_actionsVisible) {
 		p.drawPixmapRight(st::notifyBorderWidth, buttonsTop, width(), _buttonsCache);
+	}
+
+	// FurryGram: auto-dismiss progress bar (inset so it clears the rounded
+	// corners). Shrinks left-to-right over the hide countdown.
+	if (_hideProgress.animating()) {
+		p.setOpacity(1.);
+		const auto total = crl::time(st::notifyWaitLongHide);
+		const auto elapsed = crl::now() - _hideProgress.started();
+		const auto left = std::clamp(
+			1. - ((total > 0) ? (double(elapsed) / total) : 1.),
+			0.,
+			1.);
+		const auto inset = st::notifyPhotoPos.x();
+		const auto barHeight = st::lineWidth * 2;
+		const auto trackWidth = width() - 2 * inset;
+		const auto barWidth = qRound(trackWidth * left);
+		if (barWidth > 0) {
+			p.fillRect(
+				inset,
+				height() - barHeight - st::lineWidth * 2,
+				barWidth,
+				barHeight,
+				st::windowBgActive);
+		}
 	}
 }
 
@@ -903,10 +955,9 @@ void Notification::updateNotifyDisplay() {
 
 	{
 		Painter p(&img);
-		p.fillRect(0, 0, w - st::notifyBorderWidth, st::notifyBorderWidth, st::notifyBorder);
-		p.fillRect(w - st::notifyBorderWidth, 0, st::notifyBorderWidth, h - st::notifyBorderWidth, st::notifyBorder);
-		p.fillRect(st::notifyBorderWidth, h - st::notifyBorderWidth, w - st::notifyBorderWidth, st::notifyBorderWidth, st::notifyBorder);
-		p.fillRect(0, st::notifyBorderWidth, st::notifyBorderWidth, h - st::notifyBorderWidth, st::notifyBorder);
+		// FurryGram: replace the hard 4-side border with a clean accent stripe
+		// on the left edge (the rounded corners come from Images::Round below).
+		p.fillRect(0, 0, st::lineWidth * 3, h, st::windowBgActive);
 
 		if (!options.hideNameAndPhoto) {
 			if (_fromScheduled && _history->peer->isSelf()) {
@@ -1022,7 +1073,7 @@ void Notification::updateNotifyDisplay() {
 				: TextWithEntities{ name };
 		};
 		auto title = options.hideNameAndPhoto
-			? TextWithEntities{ u"AyuGram Desktop"_q }
+			? TextWithEntities{ u"FurryGram Desktop"_q }
 			: reminder
 			? tr::lng_notification_reminder(tr::now, tr::marked)
 			: topicWithChat();
@@ -1042,7 +1093,8 @@ void Notification::updateNotifyDisplay() {
 		paintTitle(p);
 	}
 
-	_cache = std::move(img);
+	// FurryGram: rounded card corners (the window is translucent).
+	_cache = Images::Round(std::move(img), ImageRoundRadius::Large);
 	if (!canReply()) {
 		toggleActionButtons(false);
 	}
@@ -1235,9 +1287,16 @@ void Notification::leaveEventHook(QEvent *e) {
 	toggleActionButtons(false);
 }
 
-void Notification::startHiding() {
+void Notification::startHiding(bool fast) {
 	if (!_history) return;
-	hideSlow();
+	_hideProgress.stop();
+	// FurryGram: once the auto-dismiss bar runs out, fade out quickly; a manual
+	// hover-leave still uses the gentle slow fade.
+	if (fast) {
+		hideFast();
+	} else {
+		hideSlow();
+	}
 }
 
 void Notification::mousePressEvent(QMouseEvent *e) {
@@ -1268,6 +1327,8 @@ bool Notification::eventFilter(QObject *o, QEvent *e) {
 void Notification::stopHiding() {
 	if (!_history) return;
 	_hideTimer.stop();
+	_hideProgress.stop();
+	update();
 	Widget::hideStop();
 }
 

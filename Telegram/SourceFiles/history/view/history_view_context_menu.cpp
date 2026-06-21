@@ -1071,6 +1071,7 @@ void AddMessageActions(
 		AyuUi::AddHideMessageAction(menu, request.item);
 		AyuUi::AddUserMessagesAction(menu, request.item);
 		AyuUi::AddRepeatMessageAction(menu, request.item, context);
+		AyuUi::AddCopyAsMarkdownAction(menu, request.item);
 		AyuUi::AddMessageDetailsAction(menu, request.item);
 	}
 
@@ -1441,6 +1442,7 @@ void FillContextMenuItems(
 		AddPhotoActions(result, lnkPhoto, item, list);
 	} else if (lnkDocument) {
 		AddDocumentActions(result, lnkDocument, item, list);
+		AyuUi::AddRevealHiddenMessageAction(result, lnkDocument, list->controller());
 	} else if (poll) {
 		const auto context = list->elementContext();
 		AddPollActions(
@@ -1456,6 +1458,7 @@ void FillContextMenuItems(
 		const auto mediaHasTextForCopy = media && media->hasTextForCopy();
 		if (const auto document = media ? media->getDocument() : nullptr) {
 			AddDocumentActions(result, document, view->data(), list);
+			AyuUi::AddRevealHiddenMessageAction(result, document, list->controller());
 		}
 		if (!link && (view->hasVisibleText() || mediaHasTextForCopy)) {
 			if (!list->hasCopyRestriction(view->data())) {

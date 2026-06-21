@@ -155,6 +155,12 @@ TopBarWidget::TopBarWidget(
 		refreshLang();
 	}, lifetime());
 
+	// FurryGram: repaint the top bar when ghost mode toggles (👻 indicator).
+	AyuSettings::ghost().ghostModeActiveChanges(
+	) | rpl::on_next([=] {
+		update();
+	}, lifetime());
+
 	_forward->setClickedCallback([=] { _forwardSelection.fire({}); });
 	_forward->setWidthChangedCallback([=] { updateControlsGeometry(); });
 	_sendNow->setClickedCallback([=] { _sendNowSelection.fire({}); });
@@ -671,6 +677,20 @@ void TopBarWidget::paintTopBar(Painter &p) {
 			paintStatus(p, statusleft, statustop, statuswidth, width());
 		}
 	} else if (namePeer) {
+		// FurryGram: ghost-mode indicator (👻) left of the chat name. Shift nameleft
+		// BEFORE the verify/premium badge layout so the badge positions correctly.
+		if (AyuSettings::ghost().isGhostModeActive()) {
+			const auto ghostText = QString::fromUtf8("\xF0\x9F\x91\xBB");
+			p.setFont(st::msgNameStyle.font);
+			const auto gw = st::msgNameStyle.font->width(ghostText)
+				+ st::dialogsChatTypeSkip;
+			if (namewidth > gw) {
+				p.setPen(st::dialogsNameFg);
+				p.drawTextLeft(nameleft, nametop, width(), ghostText);
+				nameleft += gw;
+				namewidth -= gw;
+			}
+		}
 		if (_titleNameVersion < namePeer->nameVersion()) {
 			_titleNameVersion = namePeer->nameVersion();
 			_title.setText(

@@ -24,6 +24,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/rect.h"
 #include "api/api_transcribes.h"
 #include "apiwrap.h"
+#include "ayu/features/voice_transcribe.h" // FurryGram: local whisper.
 #include "styles/style_chat.h"
 #include "window/window_session_controller.h"
 
@@ -334,6 +335,10 @@ bool TranscribeButton::hasLock() const {
 	if (session->premium()) {
 		return false;
 	}
+	// FurryGram: no premium lock for local whisper voice transcription.
+	if (!_summarize && Ayu::Voice::LocalTranscribeEnabled()) {
+		return false;
+	}
 	const auto transcribes = &session->api().transcribes();
 	if (_summarize) {
 		return transcribes->summary(_item).premiumRequired;
@@ -376,6 +381,11 @@ ClickHandlerPtr TranscribeButton::link() {
 	_link = std::make_shared<LambdaClickHandler>([=](ClickContext context) {
 		const auto item = session->data().message(id);
 		if (!item) {
+			return;
+		}
+		// FurryGram: local whisper transcription bypasses premium gating.
+		if (!summarize && Ayu::Voice::LocalTranscribeEnabled()) {
+			session->api().transcribes().toggle(item);
 			return;
 		}
 		if (session->premium()) {

@@ -50,6 +50,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
+#include "ayu/features/focus_mode.h"
 #include "ayu/utils/telegram_helpers.h"
 
 #if __has_include(<gio/gio.hpp>)
@@ -429,7 +430,7 @@ void System::schedule(Data::ItemNotification notification) {
 	const auto item = notification.item;
 	const auto type = notification.type;
 	const auto thread = item->notificationThread();
-	const auto skip = skipNotification(notification);
+	auto skip = skipNotification(notification);
 	if (skip.value == SkipState::Skip) {
 		thread->popNotification(notification);
 		return;
@@ -437,6 +438,14 @@ void System::schedule(Data::ItemNotification notification) {
 	if (isMessageHidden(item)) {
 		thread->popNotification(notification);
 		return;
+	}
+	// FurryGram: Focus mode — suppress notifications from non-allowed chats.
+	if (Ayu::Focus::Suppresses(item)) {
+		if (Ayu::Focus::HideToast()) {
+			thread->popNotification(notification);
+			return;
+		}
+		skip.silent = true; // keep a silent toast, drop the alert sound
 	}
 	const auto ready = (skip.value != SkipState::Unknown)
 		&& item->notificationReady();

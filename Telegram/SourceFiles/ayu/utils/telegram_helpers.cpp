@@ -59,6 +59,7 @@
 #include <QTimer>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
+#include <QtCore/QFile>
 
 namespace {
 
@@ -1286,6 +1287,72 @@ QString filterZalgo(const QString &text) {
 	return output;
 }
 
+namespace {
+
+QHash<ID, QString> &RegDateCacheMap() {
+	static auto map = QHash<ID, QString>();
+	return map;
+}
+
+bool &RegDateCacheLoaded() {
+	static auto loaded = false;
+	return loaded;
+}
+
+QString RegDateCachePath() {
+	return cWorkingDir() + u"tdata/furry_regdates.json"_q;
+}
+
+void EnsureRegDateCacheLoaded() {
+	if (RegDateCacheLoaded()) {
+		return;
+	}
+	RegDateCacheLoaded() = true;
+	auto f = QFile(RegDateCachePath());
+	if (!f.open(QIODevice::ReadOnly)) {
+		return;
+	}
+	const auto doc = QJsonDocument::fromJson(f.readAll());
+	if (!doc.isObject()) {
+		return;
+	}
+	const auto obj = doc.object();
+	for (auto i = obj.begin(); i != obj.end(); ++i) {
+		RegDateCacheMap()[i.key().toLongLong()] = i.value().toString();
+	}
+}
+
+void SaveRegDateCache() {
+	auto obj = QJsonObject();
+	const auto &map = RegDateCacheMap();
+	for (auto i = map.begin(); i != map.end(); ++i) {
+		obj[QString::number(i.key())] = i.value();
+	}
+	auto f = QFile(RegDateCachePath());
+	if (f.open(QIODevice::WriteOnly)) {
+		f.write(QJsonDocument(obj).toJson(QJsonDocument::Compact));
+	}
+}
+
+void cacheRegistrationDate(ID userId, const QString &text) {
+	EnsureRegDateCacheLoaded();
+	if (RegDateCacheMap().value(userId) == text) {
+		return;
+	}
+	RegDateCacheMap()[userId] = text;
+	SaveRegDateCache();
+}
+
+} // namespace
+
+std::optional<QString> getCachedRegistrationDate(ID userId) {
+	EnsureRegDateCacheLoaded();
+	const auto it = RegDateCacheMap().constFind(userId);
+	return (it != RegDateCacheMap().constEnd())
+		? std::make_optional(it.value())
+		: std::nullopt;
+}
+
 void getUserRegistrationDateInner(
 	not_null<UserData*> user,
 	ID botId,
@@ -1378,6 +1445,14 @@ void getUserRegistrationDateInner(
 
 			const auto parsedDate = QDate::fromString(date, "dd.MM.yyyy");
 			const auto formattedDate = langDayOfMonthFull(parsedDate);
+
+			if (parsedDate.isValid() && !formattedDate.isEmpty()) {
+				// FurryGram: cache a short date for inline profile display.
+				const auto approx = (flag != "EXACT");
+				cacheRegistrationDate(
+					userId,
+					(approx ? u"\x2248 "_q : QString()) + formattedDate);
+			}
 
 			if (flag == "EXACT" || flag == "INTERPOLATED") {
 				if (!isSelf) {

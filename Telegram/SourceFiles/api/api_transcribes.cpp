@@ -22,7 +22,17 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session_settings.h"
 #include "spellcheck/spellcheck_types.h"
 
+#include "ayu/features/voice_transcribe.h" // FurryGram: local whisper.
+
 namespace Api {
+
+namespace {
+
+// Sentinel request id for local (whisper) entries. Local entries never go
+// through MTP, so this is only used to drive the native "loading" UI state.
+constexpr auto kLocalRequestId = mtpRequestId(-1);
+
+} // namespace
 
 Transcribes::Transcribes(not_null<ApiWrap*> api)
 : _session(&api->session())
@@ -174,6 +184,10 @@ void Transcribes::load(not_null<HistoryItem*> item) {
 	if (!item->isHistoryEntry() || item->isLocal()) {
 		return;
 	}
+	if (Ayu::Voice::LocalTranscribeEnabled()) {
+		loadLocal(item);
+		return;
+	}
 	const auto toggleRound = [](not_null<HistoryItem*> item, Entry &entry) {
 		if (const auto media = item->media()) {
 			if (const auto document = media->document()) {
@@ -234,6 +248,45 @@ void Transcribes::load(not_null<HistoryItem*> item) {
 	entry.shown = true;
 	entry.failed = false;
 	entry.pending = false;
+}
+
+void Transcribes::loadLocal(not_null<HistoryItem*> item) {
+	const auto id = item->fullId();
+	auto &entry = _map[id];
+	entry.requestId = kLocalRequestId;
+	entry.shown = true;
+	entry.failed = false;
+	entry.pending = false;
+	if (const auto media = item->media()) {
+		if (const auto document = media->document()) {
+			if (document->isVideoMessage()) {
+				entry.roundview = true;
+				document->owner().requestItemViewRefresh(item);
+			}
+		}
+	}
+	_session->data().requestItemResize(item);
+
+	Ayu::Voice::Transcribe(item, [=](Ayu::Voice::TranscribeResult result) {
+		const auto i = _map.find(id);
+		if (i == _map.end()) {
+			return;
+		}
+		i->second.requestId = 0;
+		i->second.pending = false;
+		if (result.failed) {
+			i->second.failed = true;
+			i->second.toolong = result.toolong;
+		} else {
+			i->second.result = result.text;
+		}
+		if (const auto item = _session->data().message(id)) {
+			if (i->second.roundview) {
+				_session->data().requestItemViewRefresh(item);
+			}
+			_session->data().requestItemResize(item);
+		}
+	});
 }
 
 void Transcribes::summarize(not_null<HistoryItem*> item) {

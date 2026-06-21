@@ -27,6 +27,8 @@ using json = nlohmann::json;
 
 namespace {
 
+[[nodiscard]] std::vector<FocusProfile> DefaultFocusProfiles();
+
 std::string getSettingsPath() {
 	return (cWorkingDir() + u"tdata/ayu_settings.json"_q).toStdString();
 }
@@ -224,6 +226,32 @@ void from_json(const nlohmann::json &j, GhostModeAccountSettings &s) {
 	s._sendOfflinePacketAfterOnlineLocked = j.value("sendOfflinePacketAfterOnlineLocked", false);
 }
 
+void to_json(nlohmann::json &j, const FocusProfile &s) {
+	j = nlohmann::json{
+		{"name", s.name},
+		{"hideToast", s.hideToast},
+		{"allowPinned", s.allowPinned},
+		{"allowFolderId", s.allowFolderId},
+		{"allowExceptions", s.allowExceptions},
+		{"allowPrivateOnly", s.allowPrivateOnly},
+		{"scheduleEnabled", s.scheduleEnabled},
+		{"scheduleFrom", s.scheduleFrom},
+		{"scheduleTo", s.scheduleTo},
+	};
+}
+
+void from_json(const nlohmann::json &j, FocusProfile &s) {
+	s.name = j.value("name", std::string("Focus"));
+	s.hideToast = j.value("hideToast", false);
+	s.allowPinned = j.value("allowPinned", true);
+	s.allowFolderId = j.value("allowFolderId", 0);
+	s.allowExceptions = j.value("allowExceptions", true);
+	s.allowPrivateOnly = j.value("allowPrivateOnly", false);
+	s.scheduleEnabled = j.value("scheduleEnabled", false);
+	s.scheduleFrom = j.value("scheduleFrom", 1320);
+	s.scheduleTo = j.value("scheduleTo", 420);
+}
+
 void MessageShotSettings::setShowBackground(bool val) {
 	if (_showBackground.current() == val) return;
 	_showBackground = val;
@@ -356,6 +384,9 @@ void from_json(const nlohmann::json &j, MessageShotSettings &s) {
 AyuSettings::AyuSettings()
 : _appIcon(AyuAssets::DEFAULT_ICON)
 , _editedMark(Core::IsAppLaunched() ? tr::lng_edited(tr::now) : QString("edited")) {
+	// Seed default Focus profiles so they exist even on a fresh install (load()
+	// returns early when there is no settings file, so from_json never runs).
+	_focusProfiles = DefaultFocusProfiles();
 }
 
 AyuSettings &AyuSettings::getInstance() {
@@ -520,7 +551,7 @@ void AyuSettings::validate() {
 	validateRange(_avatarCorners, 0, AyuUiSettings::kMaxAvatarCorners, defaults._avatarCorners);
 
 	const auto embeddedType = _messageShotSettings._embeddedThemeType.current();
-	auto embeddedTypeValid = (embeddedType == -1) || (embeddedType >= 0 && embeddedType <= 3); // from Window::Theme::EmbeddedType::DayBlue to Window::Theme::EmbeddedType::NightGreen
+	auto embeddedTypeValid = (embeddedType == -1) || (embeddedType >= 0 && embeddedType <= 4); // DayBlue..NightGreen + FurryAero
 	if (!embeddedTypeValid) {
 		_messageShotSettings._embeddedThemeType = defaults._messageShotSettings._embeddedThemeType.current();
 		_messageShotSettings._embeddedThemeAccentColor = defaults._messageShotSettings._embeddedThemeAccentColor.current();
@@ -565,6 +596,112 @@ void AyuSettings::setFiltersEnabledInChats(bool val) {
 void AyuSettings::setHideFromBlocked(bool val) {
 	if (_hideFromBlocked.current() == val) return;
 	_hideFromBlocked = val;
+	save();
+}
+
+void AyuSettings::setAntiScreenshare(bool val) {
+	if (_antiScreenshare.current() == val) return;
+	_antiScreenshare = val;
+	save();
+}
+
+void AyuSettings::setFurryComposeBar(bool val) {
+	if (_furryComposeBar.current() == val) return;
+	_furryComposeBar = val;
+	save();
+}
+
+void AyuSettings::setFocusEnabled(bool val) {
+	if (_focusEnabled.current() == val) return;
+	_focusEnabled = val;
+	_focusSettingsChanged.fire({});
+	save();
+}
+
+void AyuSettings::setFocusActiveProfile(int index) {
+	if (_focusActiveProfile.current() == index) return;
+	_focusActiveProfile = index;
+	_focusSettingsChanged.fire({});
+	save();
+}
+
+void AyuSettings::setFocusProfiles(std::vector<FocusProfile> profiles) {
+	_focusProfiles = std::move(profiles);
+	_focusSettingsChanged.fire({});
+	save();
+}
+
+void AyuSettings::modifyActiveFocusProfile(
+		const std::function<void(FocusProfile&)> &fn) {
+	const auto index = _focusActiveProfile.current();
+	if (index < 0 || index >= int(_focusProfiles.size())) {
+		return;
+	}
+	fn(_focusProfiles[index]);
+	_focusSettingsChanged.fire({});
+	save();
+}
+
+void AyuSettings::setFocusException(qint64 peerId, bool enabled) {
+	const auto it = std::find(
+		_focusExceptions.begin(),
+		_focusExceptions.end(),
+		peerId);
+	const auto has = (it != _focusExceptions.end());
+	if (enabled == has) {
+		return;
+	}
+	if (enabled) {
+		_focusExceptions.push_back(peerId);
+	} else {
+		_focusExceptions.erase(it);
+	}
+	_focusSettingsChanged.fire({});
+	save();
+}
+
+bool AyuSettings::hasFocusException(qint64 peerId) const {
+	return std::find(
+		_focusExceptions.begin(),
+		_focusExceptions.end(),
+		peerId) != _focusExceptions.end();
+}
+
+FocusProfile AyuSettings::activeFocusProfile() const {
+	const auto index = _focusActiveProfile.current();
+	if (index >= 0 && index < int(_focusProfiles.size())) {
+		return _focusProfiles[index];
+	}
+	return _focusProfiles.empty() ? FocusProfile() : _focusProfiles.front();
+}
+
+void AyuSettings::setFurryAeroDefaultApplied(bool val) {
+	if (_furryAeroDefaultApplied.current() == val) return;
+	_furryAeroDefaultApplied = val;
+	save();
+}
+
+void AyuSettings::setMascotIntro(bool val) {
+	if (_mascotIntro.current() == val) return;
+	_mascotIntro = val;
+	save();
+}
+
+void AyuSettings::setGhostScheduleEnabled(bool val) {
+	if (_ghostScheduleEnabled.current() == val) return;
+	_ghostScheduleEnabled = val;
+	save();
+}
+
+void AyuSettings::setGhostScheduleFrom(int minutes) {
+	if (_ghostScheduleFrom.current() == minutes) return;
+	_ghostScheduleFrom = minutes;
+	save();
+}
+
+void AyuSettings::setGhostScheduleTo(int minutes) {
+	if (_ghostScheduleTo.current() == minutes) return;
+	_ghostScheduleTo = minutes;
 	save();
 }
 
@@ -678,6 +815,30 @@ void AyuSettings::setDisableNotificationsDelay(bool val) {
 void AyuSettings::setLocalPremium(bool val) {
 	if (_localPremium.current() == val) return;
 	_localPremium = val;
+	save();
+}
+
+void AyuSettings::setLocalTranscribe(bool val) {
+	if (_localTranscribe.current() == val) return;
+	_localTranscribe = val;
+	save();
+}
+
+void AyuSettings::setWhisperModel(const QString &val) {
+	if (_whisperModel.current() == val) return;
+	_whisperModel = val;
+	save();
+}
+
+void AyuSettings::setWhisperLanguage(const QString &val) {
+	if (_whisperLanguage.current() == val) return;
+	_whisperLanguage = val;
+	save();
+}
+
+void AyuSettings::setWhisperTranslate(bool val) {
+	if (_whisperTranslate.current() == val) return;
+	_whisperTranslate = val;
 	save();
 }
 
@@ -879,6 +1040,12 @@ void AyuSettings::setShowSavedMessagesInDrawer(bool val) {
 	save();
 }
 
+void AyuSettings::setShowChannelSearchInDrawer(bool val) {
+	if (_showChannelSearchInDrawer.current() == val) return;
+	_showChannelSearchInDrawer = val;
+	save();
+}
+
 void AyuSettings::setShowLReadToggleInDrawer(bool val) {
 	if (_showLReadToggleInDrawer.current() == val) return;
 	_showLReadToggleInDrawer = val;
@@ -1050,6 +1217,33 @@ void AyuSettings::setSingleCornerRadius(bool val) {
 	save();
 }
 
+namespace {
+
+[[nodiscard]] std::vector<FocusProfile> DefaultFocusProfiles() {
+	auto work = FocusProfile();
+	work.name = "Work";
+	work.hideToast = false; // glanceable silent popups
+	work.allowPinned = true;
+
+	auto sleep = FocusProfile();
+	sleep.name = "Sleep";
+	sleep.hideToast = true; // fully hidden
+	sleep.allowPinned = true;
+	sleep.scheduleEnabled = true;
+	sleep.scheduleFrom = 1380; // 23:00
+	sleep.scheduleTo = 480; // 08:00
+
+	auto game = FocusProfile();
+	game.name = "Game";
+	game.hideToast = true;
+	game.allowPinned = true;
+	game.allowPrivateOnly = true; // direct messages still break through
+
+	return { work, sleep, game };
+}
+
+} // namespace
+
 void to_json(nlohmann::json &j, const AyuSettings &s) {
 	auto ghostAccounts = nlohmann::json::object();
 	for (const auto &[key, value] : s._ghostAccounts) {
@@ -1066,6 +1260,17 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"filtersEnabled", s._filtersEnabled.current()},
 		{"filtersEnabledInChats", s._filtersEnabledInChats.current()},
 		{"hideFromBlocked", s._hideFromBlocked.current()},
+		{"antiScreenshare", s._antiScreenshare.current()},
+		{"furryComposeBar", s._furryComposeBar.current()},
+		{"focusEnabled", s._focusEnabled.current()},
+		{"focusActiveProfile", s._focusActiveProfile.current()},
+		{"focusProfiles", s._focusProfiles},
+		{"focusExceptions", s._focusExceptions},
+		{"furryAeroDefaultApplied", s._furryAeroDefaultApplied.current()},
+		{"mascotIntro", s._mascotIntro.current()},
+		{"ghostScheduleEnabled", s._ghostScheduleEnabled.current()},
+		{"ghostScheduleFrom", s._ghostScheduleFrom.current()},
+		{"ghostScheduleTo", s._ghostScheduleTo.current()},
 		{"semiTransparentDeletedMessages", s._semiTransparentDeletedMessages.current()},
 		{"disableAds", s._disableAds.current()},
 		{"disableStories", s._disableStories.current()},
@@ -1083,6 +1288,10 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"removeMessageTail", s._removeMessageTail.current()},
 		{"disableNotificationsDelay", s._disableNotificationsDelay.current()},
 		{"localPremium", s._localPremium.current()},
+		{"localTranscribe", s._localTranscribe.current()},
+		{"whisperModel", s._whisperModel.current()},
+		{"whisperLanguage", s._whisperLanguage.current()},
+		{"whisperTranslate", s._whisperTranslate.current()},
 		{"showChannelReactions", s._showChannelReactions.current()},
 		{"showGroupReactions", s._showGroupReactions.current()},
 		{"showPrivateChatReactions", s._showPrivateChatReactions.current()},
@@ -1116,6 +1325,7 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"showContactsInDrawer", s._showContactsInDrawer.current()},
 		{"showCallsInDrawer", s._showCallsInDrawer.current()},
 		{"showSavedMessagesInDrawer", s._showSavedMessagesInDrawer.current()},
+		{"showChannelSearchInDrawer", s._showChannelSearchInDrawer.current()},
 		{"showLReadToggleInDrawer", s._showLReadToggleInDrawer.current()},
 		{"showSReadToggleInDrawer", s._showSReadToggleInDrawer.current()},
 		{"showNightModeToggleInDrawer", s._showNightModeToggleInDrawer.current()},
@@ -1166,6 +1376,20 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._filtersEnabled = j.value("filtersEnabled", defaults._filtersEnabled.current());
 	s._filtersEnabledInChats = j.value("filtersEnabledInChats", defaults._filtersEnabledInChats.current());
 	s._hideFromBlocked = j.value("hideFromBlocked", defaults._hideFromBlocked.current());
+	s._antiScreenshare = j.value("antiScreenshare", defaults._antiScreenshare.current());
+	s._furryComposeBar = j.value("furryComposeBar", defaults._furryComposeBar.current());
+	s._focusEnabled = j.value("focusEnabled", false);
+	s._focusActiveProfile = j.value("focusActiveProfile", 0);
+	s._focusProfiles = j.value("focusProfiles", std::vector<FocusProfile>{});
+	s._focusExceptions = j.value("focusExceptions", std::vector<qint64>{});
+	if (s._focusProfiles.empty()) {
+		s._focusProfiles = DefaultFocusProfiles();
+	}
+	s._furryAeroDefaultApplied = j.value("furryAeroDefaultApplied", defaults._furryAeroDefaultApplied.current());
+	s._mascotIntro = j.value("mascotIntro", defaults._mascotIntro.current());
+	s._ghostScheduleEnabled = j.value("ghostScheduleEnabled", defaults._ghostScheduleEnabled.current());
+	s._ghostScheduleFrom = j.value("ghostScheduleFrom", defaults._ghostScheduleFrom.current());
+	s._ghostScheduleTo = j.value("ghostScheduleTo", defaults._ghostScheduleTo.current());
 	s._semiTransparentDeletedMessages = j.value("semiTransparentDeletedMessages", defaults._semiTransparentDeletedMessages.current());
 	s._disableAds = j.value("disableAds", defaults._disableAds.current());
 	s._disableStories = j.value("disableStories", defaults._disableStories.current());
@@ -1183,6 +1407,10 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._removeMessageTail = j.value("removeMessageTail", defaults._removeMessageTail.current());
 	s._disableNotificationsDelay = j.value("disableNotificationsDelay", defaults._disableNotificationsDelay.current());
 	s._localPremium = j.value("localPremium", defaults._localPremium.current());
+	s._localTranscribe = j.value("localTranscribe", defaults._localTranscribe.current());
+	s._whisperModel = j.value("whisperModel", defaults._whisperModel.current());
+	s._whisperLanguage = j.value("whisperLanguage", defaults._whisperLanguage.current());
+	s._whisperTranslate = j.value("whisperTranslate", defaults._whisperTranslate.current());
 	s._showChannelReactions = j.value("showChannelReactions", defaults._showChannelReactions.current());
 	s._showGroupReactions = j.value("showGroupReactions", defaults._showGroupReactions.current());
 	s._showPrivateChatReactions = j.value("showPrivateChatReactions", defaults._showPrivateChatReactions.current());
@@ -1216,6 +1444,7 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._showContactsInDrawer = j.value("showContactsInDrawer", defaults._showContactsInDrawer.current());
 	s._showCallsInDrawer = j.value("showCallsInDrawer", defaults._showCallsInDrawer.current());
 	s._showSavedMessagesInDrawer = j.value("showSavedMessagesInDrawer", defaults._showSavedMessagesInDrawer.current());
+	s._showChannelSearchInDrawer = j.value("showChannelSearchInDrawer", defaults._showChannelSearchInDrawer.current());
 	s._showLReadToggleInDrawer = j.value("showLReadToggleInDrawer", defaults._showLReadToggleInDrawer.current());
 	s._showSReadToggleInDrawer = j.value("showSReadToggleInDrawer", defaults._showSReadToggleInDrawer.current());
 	s._showNightModeToggleInDrawer = j.value("showNightModeToggleInDrawer", defaults._showNightModeToggleInDrawer.current());

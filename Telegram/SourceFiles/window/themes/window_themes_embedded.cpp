@@ -101,6 +101,18 @@ const auto kColorizeIgnoredKeys = base::flat_set<QLatin1String>{ {
 	qstr("premiumIconBg2"),
 } };
 
+// FurryGram night-based recolor themes: their .tdesktop-theme file is a copy
+// of the stock night theme, recolored at load-time to the designed accent
+// (the same mechanism Telegram uses for its accent variants). The source hue
+// is the stock night accent; the target is the scheme's accentColor.
+constexpr auto kFurryNightBaseAccent = "5288c1";
+
+[[nodiscard]] bool IsFurryRecolorType(EmbeddedType type) {
+	return (type == EmbeddedType::FurryViolet)
+		|| (type == EmbeddedType::FurrySunset)
+		|| (type == EmbeddedType::FurryForest);
+}
+
 style::colorizer::Color cColor(std::string_view hex) {
 	const auto q = style::ColorFromHex(hex);
 	auto hue = int();
@@ -111,6 +123,13 @@ style::colorizer::Color cColor(std::string_view hex) {
 }
 
 } // namespace
+
+bool IsFurryTheme(EmbeddedType type) {
+	return (type == EmbeddedType::FurryAero)
+		|| (type == EmbeddedType::FurryViolet)
+		|| (type == EmbeddedType::FurrySunset)
+		|| (type == EmbeddedType::FurryForest);
+}
 
 style::colorizer ColorizerFrom(
 		const EmbeddedScheme &scheme,
@@ -136,6 +155,10 @@ style::colorizer ColorizerFrom(
 	case EmbeddedType::DayBlue:
 		result.lightnessMax = 160;
 		break;
+	case EmbeddedType::FurryAero: // ocean-blue dark theme: treat like Night
+	case EmbeddedType::FurryViolet: // night-based recolors, treat like Night
+	case EmbeddedType::FurrySunset:
+	case EmbeddedType::FurryForest:
 	case EmbeddedType::Night:
 		result.keepContrast = base::flat_map<QLatin1String, Pair>{ {
 			//{ qstr("windowFgActive"), Pair{ cColor("5288c1"), cColor("17212b") } }, // windowBgActive
@@ -215,6 +238,13 @@ style::colorizer ColorizerForTheme(const QString &absolutePath) {
 	if (const auto accent = AyuFeatures::MessageShot::isChoosingTheme() ? AyuFeatures::MessageShot::getSelectedColorFromDefault() : colors.get(i->type)) {
 		return ColorizerFrom(*i, *accent);
 	}
+	// FurryGram night-recolor themes: with no user-chosen accent, recolor the
+	// stock night base from its native accent to the scheme's designed accent.
+	if (IsFurryRecolorType(i->type)) {
+		auto base = *i;
+		base.accentColor = style::ColorFromHex(kFurryNightBaseAccent);
+		return ColorizerFrom(base, i->accentColor);
+	}
 	return {};
 }
 
@@ -285,6 +315,50 @@ std::vector<EmbeddedScheme> EmbeddedThemes() {
 			":/gui/night-green.tdesktop-theme",
 			qColor("3fc1b0")
 		},
+		EmbeddedScheme{
+			EmbeddedType::FurryAero,
+			qColor("112334"), // background preview (deep ocean)
+			qColor("1b4a87"), // sent
+			qColor("16314a"), // received
+			qColor("6b808d"),
+			qColor("5a9ff0"),
+			rpl::single(QString("FurryGram Aero")),
+			":/gui/furrygram-aero.tdesktop-theme",
+			qColor("2272d4") // ocean blue accent
+		},
+		EmbeddedScheme{
+			EmbeddedType::FurryViolet,
+			qColor("1d1530"), // background preview (deep violet)
+			qColor("4a2d87"), // sent
+			qColor("261a3a"), // received
+			qColor("6b808d"),
+			qColor("9a5af0"),
+			rpl::single(QString("FurryGram Violet")),
+			":/gui/furrygram-violet.tdesktop-theme",
+			qColor("7a4fd0") // violet accent
+		},
+		EmbeddedScheme{
+			EmbeddedType::FurrySunset,
+			qColor("2e1a16"), // background preview (warm dusk)
+			qColor("8a3d28"), // sent
+			qColor("3a221a"), // received
+			qColor("8d7b6b"),
+			qColor("f0915a"),
+			rpl::single(QString("FurryGram Sunset")),
+			":/gui/furrygram-sunset.tdesktop-theme",
+			qColor("e0734a") // warm orange accent
+		},
+		EmbeddedScheme{
+			EmbeddedType::FurryForest,
+			qColor("0f2622"), // background preview (deep teal-green)
+			qColor("1b6b56"), // sent
+			qColor("16312b"), // received
+			qColor("6b8d83"),
+			qColor("5af0c0"),
+			rpl::single(QString("FurryGram Forest")),
+			":/gui/furrygram-forest.tdesktop-theme",
+			qColor("2faf8f") // teal-green accent
+		},
 	};
 }
 
@@ -337,6 +411,11 @@ std::vector<QColor> DefaultAccentColors(EmbeddedType type) {
 			qColor("7b8799"),
 			qColor("cbac67"),
 		};
+	case EmbeddedType::FurryAero:
+	case EmbeddedType::FurryViolet:
+	case EmbeddedType::FurrySunset:
+	case EmbeddedType::FurryForest:
+		return {}; // fixed designed themes, no alternate accent swatches
 	}
 	Unexpected("Type in Window::Theme::AccentColors.");
 }
@@ -425,6 +504,10 @@ bool AccentColors::setFromSerialized(const QByteArray &serialized) {
 		case EmbeddedType::DayBlue:
 		case EmbeddedType::Night:
 		case EmbeddedType::NightGreen:
+		case EmbeddedType::FurryAero:
+		case EmbeddedType::FurryViolet:
+		case EmbeddedType::FurrySunset:
+		case EmbeddedType::FurryForest:
 			data.emplace(uncheckedType, color);
 			break;
 		default:

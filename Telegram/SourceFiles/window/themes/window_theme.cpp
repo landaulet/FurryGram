@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/themes/window_themes_embedded.h"
 #include "window/themes/window_theme_editor.h"
 #include "window/window_controller.h"
+#include "ayu/ayu_settings.h"
 #include "platform/platform_specific.h"
 #include "mainwidget.h"
 #include "main/main_session.h"
@@ -497,7 +498,20 @@ void ChatBackground::initialRead() {
 		return;
 	}
 	if (_themeObject.pathAbsolute.isEmpty() && !nightMode()) {
-		applyDefaultThemeAccentColorizer();
+		// FurryGram: default a fresh install (no theme chosen yet) to the Aero
+		// theme — but only once, so a later switch to Classic/another theme
+		// stays. The one-shot flag lives in AyuSettings.
+		auto &ayu = AyuSettings::getInstance();
+		if (!ayu.furryAeroDefaultApplied()) {
+			ayu.setFurryAeroDefaultApplied(true);
+			crl::on_main([] {
+				if (Apply(u":/gui/furrygram-aero.tdesktop-theme"_q, {})) {
+					KeepApplied();
+				}
+			});
+		} else {
+			applyDefaultThemeAccentColorizer();
+		}
 	}
 	if (!Local::readBackground()) {
 		set(Data::ThemeWallPaper());

@@ -14,6 +14,7 @@
 
 #include <map>
 #include <unordered_set>
+#include <functional>
 
 
 namespace Main {
@@ -181,6 +182,24 @@ private:
 void to_json(nlohmann::json &j, const GhostModeAccountSettings &s);
 void from_json(const nlohmann::json &j, GhostModeAccountSettings &s);
 
+// FurryGram: a named "Focus" notification profile. While Focus is active and a
+// message's chat isn't allowed by this profile, its notification is suppressed
+// (hidden entirely, or kept as a silent toast — see hideToast).
+struct FocusProfile {
+	std::string name;
+	bool hideToast = false; // true: hide the popup; false: show it silently.
+	bool allowPinned = true; // pinned chats always break through.
+	int allowFolderId = 0; // chat-filter id whose chats break through (0 = off).
+	bool allowExceptions = true; // honour per-chat "always notify" exceptions.
+	bool allowPrivateOnly = false; // private chats break through (groups muted).
+	bool scheduleEnabled = false; // auto-activate Focus within a daily window.
+	int scheduleFrom = 1320; // minutes from midnight (22:00).
+	int scheduleTo = 420; // minutes from midnight (07:00).
+};
+
+void to_json(nlohmann::json &j, const FocusProfile &s);
+void from_json(const nlohmann::json &j, FocusProfile &s);
+
 class MessageShotSettings {
 public:
 	[[nodiscard]] bool showBackground() const { return _showBackground.current(); }
@@ -273,6 +292,19 @@ public:
 	[[nodiscard]] bool filtersEnabled() const { return _filtersEnabled.current(); }
 	[[nodiscard]] bool filtersEnabledInChats() const { return _filtersEnabledInChats.current(); }
 	[[nodiscard]] bool hideFromBlocked() const { return _hideFromBlocked.current(); }
+	[[nodiscard]] bool antiScreenshare() const { return _antiScreenshare.current(); }
+	[[nodiscard]] bool furryComposeBar() const { return _furryComposeBar.current(); }
+	[[nodiscard]] bool focusEnabled() const { return _focusEnabled.current(); }
+	[[nodiscard]] int focusActiveProfile() const { return _focusActiveProfile.current(); }
+	[[nodiscard]] const std::vector<FocusProfile> &focusProfiles() const { return _focusProfiles; }
+	[[nodiscard]] FocusProfile activeFocusProfile() const;
+	[[nodiscard]] const std::vector<qint64> &focusExceptions() const { return _focusExceptions; }
+	[[nodiscard]] bool hasFocusException(qint64 peerId) const;
+	[[nodiscard]] bool furryAeroDefaultApplied() const { return _furryAeroDefaultApplied.current(); }
+	[[nodiscard]] bool mascotIntro() const { return _mascotIntro.current(); }
+	[[nodiscard]] bool ghostScheduleEnabled() const { return _ghostScheduleEnabled.current(); }
+	[[nodiscard]] int ghostScheduleFrom() const { return _ghostScheduleFrom.current(); }
+	[[nodiscard]] int ghostScheduleTo() const { return _ghostScheduleTo.current(); }
 	[[nodiscard]] bool semiTransparentDeletedMessages() const { return _semiTransparentDeletedMessages.current(); }
 	[[nodiscard]] bool disableAds() const { return _disableAds.current(); }
 	[[nodiscard]] bool disableStories() const { return _disableStories.current(); }
@@ -291,6 +323,10 @@ public:
 	[[nodiscard]] bool removeMessageTail() const { return _removeMessageTail.current(); }
 	[[nodiscard]] bool disableNotificationsDelay() const { return _disableNotificationsDelay.current(); }
 	[[nodiscard]] bool localPremium() const { return _localPremium.current(); }
+	[[nodiscard]] bool localTranscribe() const { return _localTranscribe.current(); }
+	[[nodiscard]] const QString &whisperModel() const { return _whisperModel.current(); }
+	[[nodiscard]] const QString &whisperLanguage() const { return _whisperLanguage.current(); }
+	[[nodiscard]] bool whisperTranslate() const { return _whisperTranslate.current(); }
 	[[nodiscard]] bool showChannelReactions() const { return _showChannelReactions.current(); }
 	[[nodiscard]] bool showGroupReactions() const { return _showGroupReactions.current(); }
 	[[nodiscard]] bool showPrivateChatReactions() const { return _showPrivateChatReactions.current(); }
@@ -324,6 +360,7 @@ public:
 	[[nodiscard]] bool showContactsInDrawer() const { return _showContactsInDrawer.current(); }
 	[[nodiscard]] bool showCallsInDrawer() const { return _showCallsInDrawer.current(); }
 	[[nodiscard]] bool showSavedMessagesInDrawer() const { return _showSavedMessagesInDrawer.current(); }
+	[[nodiscard]] bool showChannelSearchInDrawer() const { return _showChannelSearchInDrawer.current(); }
 	[[nodiscard]] bool showLReadToggleInDrawer() const { return _showLReadToggleInDrawer.current(); }
 	[[nodiscard]] bool showSReadToggleInDrawer() const { return _showSReadToggleInDrawer.current(); }
 	[[nodiscard]] bool showNightModeToggleInDrawer() const { return _showNightModeToggleInDrawer.current(); }
@@ -357,6 +394,18 @@ public:
 	void setFiltersEnabled(bool val);
 	void setFiltersEnabledInChats(bool val);
 	void setHideFromBlocked(bool val);
+	void setAntiScreenshare(bool val);
+	void setFurryComposeBar(bool val);
+	void setFocusEnabled(bool val);
+	void setFocusActiveProfile(int index);
+	void setFocusProfiles(std::vector<FocusProfile> profiles);
+	void modifyActiveFocusProfile(const std::function<void(FocusProfile&)> &fn);
+	void setFocusException(qint64 peerId, bool enabled);
+	void setFurryAeroDefaultApplied(bool val);
+	void setMascotIntro(bool val);
+	void setGhostScheduleEnabled(bool val);
+	void setGhostScheduleFrom(int minutes);
+	void setGhostScheduleTo(int minutes);
 	void setSemiTransparentDeletedMessages(bool val);
 	void setDisableAds(bool val);
 	void setDisableStories(bool val);
@@ -375,6 +424,10 @@ public:
 	void setRemoveMessageTail(bool val);
 	void setDisableNotificationsDelay(bool val);
 	void setLocalPremium(bool val);
+	void setLocalTranscribe(bool val);
+	void setWhisperModel(const QString &val);
+	void setWhisperLanguage(const QString &val);
+	void setWhisperTranslate(bool val);
 	void setShowChannelReactions(bool val);
 	void setShowGroupReactions(bool val);
 	void setShowPrivateChatReactions(bool val);
@@ -408,6 +461,7 @@ public:
 	void setShowContactsInDrawer(bool val);
 	void setShowCallsInDrawer(bool val);
 	void setShowSavedMessagesInDrawer(bool val);
+	void setShowChannelSearchInDrawer(bool val);
 	void setShowLReadToggleInDrawer(bool val);
 	void setShowSReadToggleInDrawer(bool val);
 	void setShowNightModeToggleInDrawer(bool val);
@@ -449,6 +503,17 @@ public:
 	[[nodiscard]] rpl::producer<bool> filtersEnabledInChatsChanges() const { return _filtersEnabledInChats.changes(); }
 	[[nodiscard]] rpl::producer<bool> hideFromBlockedValue() const { return _hideFromBlocked.value(); }
 	[[nodiscard]] rpl::producer<bool> hideFromBlockedChanges() const { return _hideFromBlocked.changes(); }
+	[[nodiscard]] rpl::producer<bool> antiScreenshareValue() const { return _antiScreenshare.value(); }
+	[[nodiscard]] rpl::producer<bool> antiScreenshareChanges() const { return _antiScreenshare.changes(); }
+	[[nodiscard]] rpl::producer<bool> furryComposeBarValue() const { return _furryComposeBar.value(); }
+	[[nodiscard]] rpl::producer<bool> furryComposeBarChanges() const { return _furryComposeBar.changes(); }
+	[[nodiscard]] rpl::producer<bool> focusEnabledValue() const { return _focusEnabled.value(); }
+	[[nodiscard]] rpl::producer<bool> focusEnabledChanges() const { return _focusEnabled.changes(); }
+	[[nodiscard]] rpl::producer<int> focusActiveProfileValue() const { return _focusActiveProfile.value(); }
+	[[nodiscard]] rpl::producer<> focusSettingsChanges() const { return _focusSettingsChanged.events(); }
+	[[nodiscard]] rpl::producer<bool> ghostScheduleEnabledValue() const { return _ghostScheduleEnabled.value(); }
+	[[nodiscard]] rpl::producer<int> ghostScheduleFromValue() const { return _ghostScheduleFrom.value(); }
+	[[nodiscard]] rpl::producer<int> ghostScheduleToValue() const { return _ghostScheduleTo.value(); }
 	[[nodiscard]] rpl::producer<bool> semiTransparentDeletedMessagesValue() const { return _semiTransparentDeletedMessages.value(); }
 	[[nodiscard]] rpl::producer<bool> semiTransparentDeletedMessagesChanges() const { return _semiTransparentDeletedMessages.changes(); }
 	[[nodiscard]] rpl::producer<bool> disableAdsValue() const { return _disableAds.value(); }
@@ -485,6 +550,10 @@ public:
 	[[nodiscard]] rpl::producer<bool> disableNotificationsDelayChanges() const { return _disableNotificationsDelay.changes(); }
 	[[nodiscard]] rpl::producer<bool> localPremiumValue() const { return _localPremium.value(); }
 	[[nodiscard]] rpl::producer<bool> localPremiumChanges() const { return _localPremium.changes(); }
+	[[nodiscard]] rpl::producer<bool> localTranscribeValue() const { return _localTranscribe.value(); }
+	[[nodiscard]] rpl::producer<bool> localTranscribeChanges() const { return _localTranscribe.changes(); }
+	[[nodiscard]] rpl::producer<QString> whisperModelValue() const { return _whisperModel.value(); }
+	[[nodiscard]] rpl::producer<QString> whisperModelChanges() const { return _whisperModel.changes(); }
 	[[nodiscard]] rpl::producer<bool> showChannelReactionsValue() const { return _showChannelReactions.value(); }
 	[[nodiscard]] rpl::producer<bool> showChannelReactionsChanges() const { return _showChannelReactions.changes(); }
 	[[nodiscard]] rpl::producer<bool> showGroupReactionsValue() const { return _showGroupReactions.value(); }
@@ -619,6 +688,18 @@ private:
 	rpl::variable<bool> _filtersEnabled = false;
 	rpl::variable<bool> _filtersEnabledInChats = false;
 	rpl::variable<bool> _hideFromBlocked = false;
+	rpl::variable<bool> _antiScreenshare = false;
+	rpl::variable<bool> _furryComposeBar = false;
+	rpl::variable<bool> _focusEnabled = false;
+	rpl::variable<int> _focusActiveProfile = 0;
+	std::vector<FocusProfile> _focusProfiles;
+	std::vector<qint64> _focusExceptions;
+	rpl::event_stream<> _focusSettingsChanged;
+	rpl::variable<bool> _furryAeroDefaultApplied = false;
+	rpl::variable<bool> _mascotIntro = true;
+	rpl::variable<bool> _ghostScheduleEnabled = false;
+	rpl::variable<int> _ghostScheduleFrom = 1320; // 22:00 (minutes from midnight)
+	rpl::variable<int> _ghostScheduleTo = 480; // 08:00
 	rpl::variable<bool> _semiTransparentDeletedMessages = false;
 	rpl::variable<bool> _disableAds = true;
 	rpl::variable<bool> _disableStories = false;
@@ -636,6 +717,10 @@ private:
 	rpl::variable<bool> _removeMessageTail = false;
 	rpl::variable<bool> _disableNotificationsDelay = false;
 	rpl::variable<bool> _localPremium = false;
+	rpl::variable<bool> _localTranscribe = false;
+	rpl::variable<QString> _whisperModel = QString::fromUtf8("base");
+	rpl::variable<QString> _whisperLanguage = QString::fromUtf8("auto");
+	rpl::variable<bool> _whisperTranslate = false;
 	rpl::variable<bool> _showChannelReactions = true;
 	rpl::variable<bool> _showGroupReactions = true;
 	rpl::variable<bool> _showPrivateChatReactions = true;
@@ -669,6 +754,7 @@ private:
 	rpl::variable<bool> _showContactsInDrawer = true;
 	rpl::variable<bool> _showCallsInDrawer = true;
 	rpl::variable<bool> _showSavedMessagesInDrawer = true;
+	rpl::variable<bool> _showChannelSearchInDrawer = true;
 	rpl::variable<bool> _showLReadToggleInDrawer = false;
 	rpl::variable<bool> _showSReadToggleInDrawer = true;
 	rpl::variable<bool> _showNightModeToggleInDrawer = true;

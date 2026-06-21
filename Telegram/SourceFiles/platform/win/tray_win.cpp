@@ -80,6 +80,17 @@ bool DarkTasbarValueValid/* = false*/;
 	return DarkTaskbar;
 }
 
+// FurryGram: the tray icon is the brand image (furrygram-tray.png) for all
+// modes. This is tray-only — the app icon / logo (Window::Logo) is untouched.
+[[nodiscard]] QImage FurryTrayImage(int size) {
+	Expects(size > 0);
+
+	static const auto Original = QImage(u":/gui/furrygram-tray.png"_q);
+	return Original.isNull()
+		? QImage()
+		: Original.scaledToWidth(size, Qt::SmoothTransformation);
+}
+
 [[nodiscard]] QImage MonochromeIconFor(int size, bool darkMode) {
 	Expects(size > 0);
 
@@ -126,11 +137,13 @@ bool DarkTasbarValueValid/* = false*/;
 		Window::CounterLayerArgs &&args,
 		bool supportMode,
 		bool smallIcon,
-		bool monochrome) {
+		bool monochrome,
+		bool brandImage) {
 	static auto ScaledLogo = base::flat_map<int, QImage>();
 	static auto ScaledLogoNoMargin = base::flat_map<int, QImage>();
 	static auto ScaledLogoDark = base::flat_map<int, QImage>();
 	static auto ScaledLogoLight = base::flat_map<int, QImage>();
+	static auto ScaledBrand = base::flat_map<int, QImage>(); // FurryGram tray
 
 	static auto lastUsedIcon = AyuAssets::currentAppLogoName();
 
@@ -148,7 +161,9 @@ bool DarkTasbarValueValid/* = false*/;
 	}
 
 	const auto darkMode = IsDarkTaskbar();
-	auto &scaled = (monochrome && darkMode)
+	auto &scaled = brandImage
+		? ScaledBrand
+		: (monochrome && darkMode)
 		? (*darkMode
 			? ScaledLogoDark
 			: ScaledLogoLight)
@@ -159,6 +174,13 @@ bool DarkTasbarValueValid/* = false*/;
 	auto result = [&] {
 		if (const auto it = scaled.find(args.size); it != scaled.end()) {
 			return it->second;
+		} else if (brandImage) {
+			// FurryGram: brand image — ONLY for the real system tray icon.
+			// The window / taskbar / Alt-Tab icon keeps the app logo below.
+			return scaled.emplace(
+				args.size,
+				FurryTrayImage(args.size)
+			).first->second;
 		} else if (monochrome && darkMode) {
 			return MonochromeIconFor(args.size, *darkMode);
 		}
@@ -265,7 +287,8 @@ void Tray::updateIcon() {
 				Core::App().unreadBadgeMuted()),
 			true,
 			Core::App().settings().trayIconMonochrome(),
-			session && session->supportMode()));
+			session && session->supportMode(),
+			true)); // FurryGram: brand image for the system tray only
 	_icon->updateIcon(forTrayIcon);
 }
 
@@ -362,12 +385,14 @@ QPixmap Tray::IconWithCounter(
 		Window::CounterLayerArgs &&args,
 		bool smallIcon,
 		bool monochrome,
-		bool supportMode) {
+		bool supportMode,
+		bool brandImage) {
 	return Ui::PixmapFromImage(ImageIconWithCounter(
 		std::move(args),
 		supportMode,
 		smallIcon,
-		monochrome));
+		monochrome,
+		brandImage));
 }
 
 void WriteIco(const QString &path, std::vector<QImage> images) {

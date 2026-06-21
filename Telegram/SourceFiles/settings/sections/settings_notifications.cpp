@@ -1,4 +1,4 @@
-/*
+﻿/*
 This file is part of Telegram Desktop,
 the official desktop application for the Telegram messaging service.
 
@@ -514,7 +514,7 @@ void NotificationsCount::prepareNotificationSampleLarge() {
 		p.setPen(st::dialogsNameFg);
 		p.setFont(st::msgNameFont);
 
-		auto notifyTitle = st::msgNameFont->elided(u"AyuGram Desktop"_q, rectForName.width());
+		auto notifyTitle = st::msgNameFont->elided(u"FurryGram Desktop"_q, rectForName.width());
 		p.drawText(rectForName.left(), rectForName.top() + st::msgNameFont->ascent, notifyTitle);
 
 		st::notifyClose.icon.paint(p, w - st::notifyClosePos.x() - st::notifyClose.width + st::notifyClose.iconPosition.x(), st::notifyClosePos.y() + st::notifyClose.iconPosition.y(), w);

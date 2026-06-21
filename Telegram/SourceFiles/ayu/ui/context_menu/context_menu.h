@@ -41,10 +41,14 @@ void AddDeleteOwnMessagesAction(PeerData *peerData,
 								not_null<Window::SessionController*> sessionController,
 								const Window::PeerMenuCallback &addCallback);
 
+void AddRevealHiddenMessageAction(not_null<Ui::PopupMenu*> menu,
+								  DocumentData *document,
+								  not_null<Window::SessionController*> controller);
 void AddHistoryAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item);
 void AddHideMessageAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item);
 void AddUserMessagesAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item);
 void AddMessageDetailsAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item);
+void AddCopyAsMarkdownAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item);
 void AddRepeatMessageAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item, HistoryView::Context context);
 void AddReadUntilAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item);
 void AddBurnAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item);

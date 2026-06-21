@@ -38,6 +38,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_file_click_handler.h"
 #include "api/api_transcribes.h"
 #include "apiwrap.h"
+#include "ayu/features/voice_transcribe.h" // FurryGram: local whisper.
 #include "styles/style_chat.h"
 #include "styles/style_dialogs.h"
 
@@ -444,13 +445,17 @@ QSize Document::countOptimalSize() {
 		const auto history = _realParent->history();
 		const auto session = &history->session();
 		const auto transcribes = &session->api().transcribes();
+		// FurryGram: local whisper makes the button available without premium.
+		const auto localVoice = Ayu::Voice::LocalTranscribeEnabled();
 		if ((_parent->data()->media() && _parent->data()->media()->ttlSeconds())
 			|| _realParent->isScheduled()
 			|| _realParent->isAdminLogEntry()
-			|| (!session->premium()
+			|| (!localVoice
+				&& !session->premium()
 				&& !transcribes->freeFor(_realParent)
 				&& !transcribes->trialsSupport())
-			|| (!session->premium()
+			|| (!localVoice
+				&& !session->premium()
 				&& _data->duration() > transcribes->trialsMaxLengthMs())) {
 			voice->transcribe = nullptr;
 			voice->transcribeText = {};
