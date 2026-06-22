@@ -1,8 +1,7 @@
 # FurryGram
 
-Кастомизированный клиент [Telegram Desktop](https://github.com/telegramdesktop/tdesktop),
-форк [AyuGram](https://github.com/AyuGram/AyuGramDesktop), с упором на приватность и
-офлайн-инструменты, работающие прямо на устройстве.
+Кастомизированный клиент [Telegram Desktop](https://github.com/telegramdesktop/tdesktop)
+с упором на приватность и офлайн-инструменты, работающие прямо на устройстве.
 
 [ [English](README.md) | Русский ]
 

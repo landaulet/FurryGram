@@ -1,8 +1,7 @@
 # FurryGram
 
-A customized [Telegram Desktop](https://github.com/telegramdesktop/tdesktop) client, forked from
-[AyuGram](https://github.com/AyuGram/AyuGramDesktop), focused on privacy features and offline,
-on-device tools.
+A customized [Telegram Desktop](https://github.com/telegramdesktop/tdesktop) client, focused on
+privacy features and offline, on-device tools.
 
 [ English | [Русский](README-RU.md) ]
 
