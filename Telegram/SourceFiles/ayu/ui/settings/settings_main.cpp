@@ -183,10 +183,10 @@ void BuildLinks(SectionBuilder &builder) {
 		.id = u"ayu/website"_q,
 		.title = tr::ayu_LinksDocumentation(),
 		.icon = { &st::menuIconIpAddress },
-		.label = rpl::single(QString("docs.ayugram.one")),
+		.label = rpl::single(QString("landaulet.github.io/FurryGram-docs")),
 		.onClick = [=] {
 			QDesktopServices::openUrl(
-				QString("https://docs.ayugram.one"));
+				QString("https://landaulet.github.io/FurryGram-docs/"));
 		},
 	});
 
