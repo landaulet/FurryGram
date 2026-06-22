@@ -845,6 +845,10 @@ void searchPeerInner(const QString &peerId, Main::Session *session, const Userna
 				[&](const MTPDbotInlineMessageMediaWebPage &data)
 				{
 					return QString();
+				},
+				[&](const MTPDbotInlineMessageRichMessage &data)
+				{
+					return QString();
 				});
 
 			if (text.isEmpty() || text.contains(usernameResolverEmpty)) {
@@ -1426,6 +1430,10 @@ void getUserRegistrationDateInner(
 					return QString();
 				},
 				[&](const MTPDbotInlineMessageMediaWebPage &data)
+				{
+					return QString();
+				},
+				[&](const MTPDbotInlineMessageRichMessage &data)
 				{
 					return QString();
 				});

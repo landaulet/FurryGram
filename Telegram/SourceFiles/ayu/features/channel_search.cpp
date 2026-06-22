@@ -168,6 +168,7 @@ bool SearchController::channelOk(PeerId peerId) const {
 
 void SearchController::requestContacts() {
 	_contactsId = _api.request(MTPcontacts_Search(
+		MTP_flags(0),
 		MTP_string(_query),
 		MTP_int(SearchPeopleLimit)
 	)).done([=](const MTPcontacts_Found &result, mtpRequestId requestId) {

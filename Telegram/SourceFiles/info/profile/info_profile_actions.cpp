@@ -1776,7 +1776,6 @@ Section DetailsFiller::makeInfo() {
 				}
 				return false;
 			});
-			AddRegistrationOrCreationButton(controller, _peer, idInfo, fitLabelToButton);
 
 			// FurryGram: inline registration date (cached; fetched once if unknown).
 			if (!user->isBot() && !user->isServiceUser()) {
@@ -1931,7 +1930,6 @@ Section DetailsFiller::makeInfo() {
 				}
 				return false;
 			});
-			AddRegistrationOrCreationButton(controller, _peer, idInfo, fitLabelToButton);
 		}
 
 		if (_topic) {
