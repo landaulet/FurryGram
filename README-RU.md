@@ -1,5 +1,7 @@
 # FurryGram
 
+<img src=".github/FurryGram.png" width="140" align="right" alt="FurryGram logo">
+
 Кастомизированный клиент [Telegram Desktop](https://github.com/telegramdesktop/tdesktop)
 с упором на приватность и офлайн-инструменты, работающие прямо на устройстве.
 

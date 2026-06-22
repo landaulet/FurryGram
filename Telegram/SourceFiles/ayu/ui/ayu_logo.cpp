@@ -23,7 +23,7 @@ namespace AyuAssets {
 QString appIcoPath() {
 	const auto &settings = AyuSettings::getInstance();
 	return cWorkingDir()
-		+ u"tdata/AyuGram-"_q
+		+ u"tdata/FurryGram-"_q
 		+ settings.appIcon()
 		+ u".ico"_q;
 }

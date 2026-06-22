@@ -1,5 +1,7 @@
 # FurryGram
 
+<img src=".github/FurryGram.png" width="140" align="right" alt="FurryGram logo">
+
 A customized [Telegram Desktop](https://github.com/telegramdesktop/tdesktop) client, focused on
 privacy features and offline, on-device tools.
 
