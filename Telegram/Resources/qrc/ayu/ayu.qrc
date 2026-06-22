@@ -1,8 +1,8 @@
 <RCC>
     <qresource prefix="/gui">
-        <file alias="art/ayu/alt/app.svg">../../art/ayu/alt/app.svg</file>
+        <file alias="art/ayu/alt/app.png">../../art/ayu/alt/app.png</file>
         <file alias="art/ayu/alt/app_icon.ico">../../art/ayu/alt/app_icon.ico</file>
-        <file alias="art/ayu/bard/app.svg">../../art/ayu/bard/app.svg</file>
+        <file alias="art/ayu/bard/app.png">../../art/ayu/bard/app.png</file>
         <file alias="art/ayu/bard/app_icon.ico">../../art/ayu/bard/app_icon.ico</file>
         <file alias="art/ayu/chibi/app.png">../../art/ayu/chibi/app.png</file>
         <file alias="art/ayu/chibi/app_icon.ico">../../art/ayu/chibi/app_icon.ico</file>
@@ -13,9 +13,9 @@
         <file alias="art/ayu/default/app_icon.ico">../../art/ayu/default/app_icon.ico</file>
         <file alias="art/ayu/discord/app.svg">../../art/ayu/discord/app.svg</file>
         <file alias="art/ayu/discord/app_icon.ico">../../art/ayu/discord/app_icon.ico</file>
-        <file alias="art/ayu/extera/app.svg">../../art/ayu/extera/app.svg</file>
+        <file alias="art/ayu/extera/app.png">../../art/ayu/extera/app.png</file>
         <file alias="art/ayu/extera/app_icon.ico">../../art/ayu/extera/app_icon.ico</file>
-        <file alias="art/ayu/extera2/app.svg">../../art/ayu/extera2/app.svg</file>
+        <file alias="art/ayu/extera2/app.png">../../art/ayu/extera2/app.png</file>
         <file alias="art/ayu/extera2/app_icon.ico">../../art/ayu/extera2/app_icon.ico</file>
         <file alias="art/ayu/nothing/app.svg">../../art/ayu/nothing/app.svg</file>
         <file alias="art/ayu/nothing/app_icon.ico">../../art/ayu/nothing/app_icon.ico</file>
