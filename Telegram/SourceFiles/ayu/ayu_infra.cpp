@@ -75,7 +75,9 @@ void init() {
 	initUiSettings();
 	initIcon();
 	initWorker();
-	initRCManager();
+	// FurryGram: RCManager disabled — it polls AyuGram servers (update.ayugram.one/rc,
+	// exteraGram fallback) hourly. Re-enable once we have our own RC endpoint.
+	// initRCManager();
 	initTranslator();
 	FurryGhostSchedule::Start();
 	Ayu::Focus::Start();
