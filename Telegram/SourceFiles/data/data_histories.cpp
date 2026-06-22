@@ -682,7 +682,7 @@ void Histories::sendReadRequests() {
 	// AyuGram sendReadMessages
 	const auto &ghost = AyuSettings::ghost(&_owner->session());
 	if (!ghost.sendReadMessages()) {
-		DEBUG_LOG(("[AyuGram] Don't read messages"));
+		DEBUG_LOG(("[FurryGram] Don't read messages"));
 		_states.clear();
 		return;
 	}
