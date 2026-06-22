@@ -4,6 +4,8 @@
 // but be respectful and credit the original author.
 //
 // Copyright @Radolyn, 2026
+//
+// Modified as part of FurryGram, 2026.
 #include "ayu/ui/utils/ayu_profile_values.h"
 
 #include "ayu/ayu_settings.h"

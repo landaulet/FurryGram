@@ -4,6 +4,8 @@
 // but be respectful and credit the original author.
 //
 // Copyright @Radolyn, 2026
+//
+// Modified as part of FurryGram, 2026.
 #ifdef Q_OS_WIN
 
 #include "ayu/utils/windows_utils.h"

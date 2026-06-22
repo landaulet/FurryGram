@@ -4,6 +4,8 @@
 // but be respectful and credit the original author.
 //
 // Copyright @Radolyn, 2026
+//
+// Modified as part of FurryGram, 2026.
 #include "ayu/ui/settings/settings_filters.h"
 
 #include "lang_auto.h"

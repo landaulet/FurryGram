@@ -4,6 +4,8 @@
 // but be respectful and credit the original author.
 //
 // Copyright @Radolyn, 2026
+//
+// Modified as part of FurryGram, 2026.
 #pragma once
 
 #define ICON(name, value) const auto name##_ICON = QStringLiteral(value)

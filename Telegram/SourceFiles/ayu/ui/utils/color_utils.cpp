@@ -5,6 +5,8 @@
 //
 // Copyright @Radolyn, 2026
 //
+// Modified as part of FurryGram, 2026.
+//
 // Code is based on https://github.com/androidx/androidx
 #include "ayu/ui/utils/color_utils.h"
 
