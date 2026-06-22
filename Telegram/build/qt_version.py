@@ -9,5 +9,5 @@ def resolve(arch):
             os.environ['QT'] = '6.11.1'
         else:
             print('Choosing Qt 5.')
-            os.environ['QT'] = '5.15.19'
+            os.environ['QT'] = '5.15.18' # FurryGram: match the Qt prebuilt on disk.
     return True
