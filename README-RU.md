@@ -1,162 +1,66 @@
-# AyuGram
+# FurryGram
 
-![AyuGram Лого](.github/AyuGram.png) ![AyuChan](.github/AyuChan.png)
+Кастомизированный клиент [Telegram Desktop](https://github.com/telegramdesktop/tdesktop),
+форк [AyuGram](https://github.com/AyuGram/AyuGramDesktop), с упором на приватность и
+офлайн-инструменты, работающие прямо на устройстве.
 
-[ [English](README.md)  | Русский ]
+[ [English](README.md) | Русский ]
 
-## Функции и Фишки
+## Возможности
 
-- Полный режим призрака (настраиваемый)
-- История удалений и изменений сообщений
-- Кастомизация шрифта
-- Режим Стримера
-- Локальный телеграм премиум
-- Переводчик
-- Превью медиа и быстрая реакция при сильном нажатии на тачпад (macOS)
-- Улучшенный вид
+Поверх набора функций AyuGram (полный режим призрака, история сообщений / анти-recall,
+локальный Telegram Premium, режим стримера, кастомизация шрифта, переводчик и др.)
+FurryGram добавляет:
 
-И многое другое. Посмотрите нашу [Документацию](https://docs.ayugram.one/desktop/) для более подробной информации.
+- **Офлайн-OCR** — распознавание текста на фото локально (Tesseract, ничего не уходит наружу),
+  с пунктом «Распознать текст» в просмотрщике и загрузкой данных по языкам
+- **Офлайн-транскрипция голосовых** — голосовые → текст на устройстве (whisper.cpp, CPU)
+- **Поиск картинок по смыслу (CLIP)** — поиск изображений в чате по текстовому описанию, офлайн
+- **Поиск каналов** — находит каналы по содержимому постов, а не только по названию
+- **Focus mode** — именованные профили уведомлений (Работа / Сон / Игра) со списками
+  разрешений и расписанием
+- **Переработанная панель ввода** (включается в настройках) и обновлённые тосты уведомлений
+- **Мелкие удобства** — счётчик символов, «Скопировать как Markdown»
 
-<h3>
-  <details>
-    <summary>Превью</summary>
-    <table>
-      <tr>
-        <td><img src='.github/demos/demo1.png' width='268' alt='Preferences'></td>
-        <td><img src='.github/demos/demo2.png' width='268' alt='AyuGram Options'></td>
-        <td><img src='.github/demos/demo3.png' width='268' alt='Message Filters'></td>
-      </tr>
-      <tr>
-        <td><img src='.github/demos/demo4.png' width='268' alt='Appearance'></td>
-        <td><img src='.github/demos/demo5.png' width='268' alt='Chats'></td>
-      </tr>
-    </table>
-  </details>
-</h3>
+## Загрузка
 
-## Установка
+Готовые сборки под Windows выкладываются в Telegram-канал:
+**[@FurryGramReleases](https://t.me/FurryGramReleases)**
 
-### Windows
+(Пакетных менеджеров пока нет — берите сборку из канала и запускайте.)
 
-#### Официальная версия
+## Сборка (Windows)
 
-Вы можете скачать готовый бинарный файл со вкладки [Releases](https://github.com/AyuGram/AyuGramDesktop/releases) или из
-[Телеграм канала](https://t.me/AyuGramReleases).
+FurryGram собирается на тулчейне upstream Telegram Desktop (CMake + MSVC 2022, Qt 5.15).
+Подготовьте сторонние библиотеки как для tdesktop, затем из корня репозитория:
 
-#### Winget
-
-```bash
-winget install RadolynLabs.AyuGramDesktop
+```bat
+:: конфигурация (Ninja Multi-Config — быстрые инкрементальные сборки)
+configure-ninja.bat
+:: сборка
+build-ninja.bat
 ```
 
-#### Scoop
+Также поддерживается генератор Visual Studio через `configure-furry.bat` + `build-furry-step1.bat`.
 
-```bash
-scoop bucket add extras
-scoop install ayugram
-```
+Убедитесь, что в VS Build Tools установлено: C++ MFC (x86 и x64), C++ ATL (x86 и x64),
+последний Windows 11 SDK.
 
-#### Сборка вручную
+## Благодарности
 
-Следуйте [официальному руководству](https://github.com/AyuGram/AyuGramDesktop/blob/dev/docs/building-win-x64.md), если
-вы хотите собрать AyuGram сами.
+FurryGram — производная работа, стоящая на плечах:
 
-### macOS
+- [Telegram Desktop](https://github.com/telegramdesktop/tdesktop) — upstream-клиент
+- [AyuGram](https://github.com/AyuGram/AyuGramDesktop) от [@Radolyn](https://github.com/Radolyn) — форк, на котором основан FurryGram
 
-#### Официальная версия
+### Библиотеки
 
-Вы можете скачать подписанный пакет со вкладки [Releases](https://github.com/AyuGram/AyuGramDesktop/releases).
+- [JSON for Modern C++](https://github.com/nlohmann/json), [SQLite](https://github.com/sqlite/sqlite), [sqlite_orm](https://github.com/fnc12/sqlite_orm)
+- [Tesseract](https://github.com/tesseract-ocr/tesseract) + [Leptonica](https://github.com/DanBloomberg/leptonica) — OCR
+- [whisper.cpp](https://github.com/ggml-org/whisper.cpp) — транскрипция голоса
+- [QuickJS](https://github.com/quickjs-ng/quickjs)
 
-#### Homebrew
+## Лицензия
 
-```bash
-brew install --cask ayugram
-```
-
-### Arch Linux
-
-#### Из исходников (рекомендованный способ)
-
-Установите `ayugram-desktop` из [AUR](https://aur.archlinux.org/packages/ayugram-desktop).
-
-#### Готовые бинарники
-
-Установите `ayugram-desktop-bin` из [AUR](https://aur.archlinux.org/packages/ayugram-desktop-bin).
-
-Примечание: данный пакет собирается не нами.
-
-### NixOS
-
-#### Флейк (рекомендуется)
-
-Установите `ayugram-desktop` из [ndfined-crp/ayugram-desktop](https://github.com/ndfined-crp/ayugram-desktop)
-
-#### Nixpkgs
-
-Установите `ayugram-desktop` из [nixpkgs](https://search.nixos.org/packages?channel=unstable&show=ayugram-desktop)
-
-### ALT Linux
-
-[Sisyphus](https://packages.altlinux.org/en/sisyphus/srpms/ayugram-desktop/)
-
-### Gentoo Linux
-
-Инструкцию по установке можно найти в [этом репозитории](https://codeberg.org/OverLessArtem/ayugram-ebuild-gentoo).
-
-### Void Linux
-Инструкцию по установке можно найти в [этом репозитории](https://codeberg.org/OverLessArtem/ayugram-template-void)
-
-### EPM
-
-`epm play ayugram`
-
-### Fedora
-
-Из репозитория [RPM Fusion](https://admin.rpmfusion.org/pkgdb/package/free/ayugram-desktop/).
-
-```bash
-dnf install ayugram-desktop
-```
-
-### Любой другой Линукс дистрибутив
-
-Flatpak: https://github.com/0FL01/AyuGramDesktop-flatpak
-
-Или следуйте [официальному руководству](https://github.com/AyuGram/AyuGramDesktop/blob/dev/docs/building-linux.md).
-
-### Примечания для Windows
-
-Убедитесь что у вас присутствуют эти зависимости:
-
-- C++ MFC latest (x86 & x64)
-- C++ ATL latest (x86 & x64)
-- последний Windows 11 SDK
-
-## Пожертвования
-
-Вам нравится использовать **AyuGram**? Оставьте нам чаевые!
-
-[Здесь доступные варианты.](https://docs.ayugram.one/donate/)
-
-## Использованные материалы
-
-### Телеграм клиенты
-
-- [Telegram Desktop](https://github.com/telegramdesktop/tdesktop)
-- [Kotatogram](https://github.com/kotatogram/kotatogram-desktop)
-- [64Gram](https://github.com/TDesktop-x64/tdesktop)
-- [Forkgram](https://github.com/forkgram/tdesktop)
-
-### Использованные библиотеки
-
-- [JSON for Modern C++](https://github.com/nlohmann/json)
-- [SQLite](https://github.com/sqlite/sqlite)
-- [sqlite_orm](https://github.com/fnc12/sqlite_orm)
-
-### Иконки
-
-- [Solar Icon Set](https://www.figma.com/community/file/1166831539721848736)
-
-### Боты
-
-- [TelegramDB](https://t.me/tgdatabase) для получения юзернейма по ID (до закрытия бесплатной версии 2 апреля 2026)
+Лицензируется под GNU General Public License v3, как Telegram Desktop и AyuGram.
+См. [LICENSE](LICENSE).
