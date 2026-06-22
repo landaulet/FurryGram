@@ -185,13 +185,27 @@ void AddOption(
 		toggles->fire_copy(option.value());
 	}, lifetime);
 
+	// FurryGram (AyuGram): an option may carry a referrer that turns the row
+	// into a navigation button to the real setting instead of a toggle.
+	const auto referrer = OptionReferrer(option);
 	const auto button = inner->add(object_ptr<Button>(
 		inner,
 		rpl::single(name),
-		(option.relevant()
-			? st::settingsButtonNoIcon
-			: st::settingsOptionDisabled)
-	))->toggleOn(toggles->events_starting_with(option.value()));
+		((referrer.isEmpty() && !option.relevant())
+			? st::settingsOptionDisabled
+			: st::settingsButtonNoIcon)));
+	if (referrer.isEmpty()) {
+		button->toggleOn(toggles->events_starting_with(option.value()));
+	} else {
+		button->addClickHandler([=] {
+			const auto resolved = ResolveReferrer(
+				referrer,
+				&controller->session());
+			controller->setHighlightControlId(resolved.controlId);
+			controller->showSettings(resolved.section);
+			window->activate();
+		});
+	}
 
 	if (registerHighlight) {
 		registerHighlight(u"experimental/"_q + option.id(), button);
@@ -215,7 +229,9 @@ void AddOption(
 		e->accept();
 	}, button->lifetime());
 
-	const auto restarter = (option.relevant() && option.restartRequired())
+	const auto restarter = (referrer.isEmpty()
+			&& option.relevant()
+			&& option.restartRequired())
 		? button->lifetime().make_state<base::Timer>()
 		: nullptr;
 	if (restarter) {
@@ -228,19 +244,21 @@ void AddOption(
 			}));
 		});
 	}
-	button->toggledChanges(
-	) | rpl::on_next([=, &option](bool toggled) {
-		if (!option.relevant() && toggled != option.defaultValue()) {
-			toggles->fire_copy(option.defaultValue());
-			window->showToast(
-				tr::lng_settings_experimental_irrelevant(tr::now));
-			return;
-		}
-		option.set(toggled);
-		if (restarter) {
-			restarter->callOnce(st::settingsButtonNoIcon.toggle.duration);
-		}
-	}, inner->lifetime());
+	if (referrer.isEmpty()) {
+		button->toggledChanges(
+		) | rpl::on_next([=, &option](bool toggled) {
+			if (!option.relevant() && toggled != option.defaultValue()) {
+				toggles->fire_copy(option.defaultValue());
+				window->showToast(
+					tr::lng_settings_experimental_irrelevant(tr::now));
+				return;
+			}
+			option.set(toggled);
+			if (restarter) {
+				restarter->callOnce(st::settingsButtonNoIcon.toggle.duration);
+			}
+		}, inner->lifetime());
+	}
 
 	if (!description.isEmpty()) {
 		Ui::AddSkip(inner, st::settingsCheckboxesSkip);

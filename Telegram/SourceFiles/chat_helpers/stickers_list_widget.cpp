@@ -871,6 +871,11 @@ void StickersListWidget::fillLocalSearchShortcuts(const QString &query) {
 }
 
 bool StickersListWidget::addSearchShortcut(not_null<StickersSet*> set) {
+	// FurryGram (AyuGram): hide not-installed sets when "show only added" is on.
+	if (AyuSettings::getInstance().showOnlyAddedEmojisAndStickers()
+		&& !SetInMyList(set->flags)) {
+		return false;
+	}
 	if (ranges::contains(_searchShortcutSets, set->id, &Set::id)) {
 		return false;
 	}
