@@ -224,7 +224,10 @@ JSValue Api_writeFile(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv
 }
 
 QString Manager::folder() {
-	return QGuiApplication::applicationDirPath() + u"/scripts"_q;
+	// Store scripts in the working/data dir (next to tdata) so they persist
+	// regardless of the exe location. For installed builds applicationDirPath()
+	// would be Program Files (read-only); cWorkingDir() is always writable.
+	return cWorkingDir() + u"scripts"_q;
 }
 
 // ---- per-script settings storage (scripts/<name>.settings.json) ----
