@@ -72,10 +72,6 @@ void BuildHeader(SectionBuilder &builder) {
 			raw,
 			rpl::single(QString("v") + QString::fromLatin1(AppVersionStr)),
 			st::furryHeaderVersion);
-		const auto desc = Ui::CreateChild<Ui::FlatLabel>(
-			raw,
-			tr::ayu_SettingsDescription(),
-			st::furryHeaderDesc);
 
 		raw->widthValue(
 		) | rpl::on_next([=](int width) {
@@ -87,10 +83,8 @@ void BuildHeader(SectionBuilder &builder) {
 
 			title->resizeToWidth(textWidth);
 			version->resizeToWidth(textWidth);
-			desc->resizeToWidth(textWidth);
 
-			const auto textHeight = title->height() + vgap
-				+ version->height() + vgap + desc->height();
+			const auto textHeight = title->height() + vgap + version->height();
 			const auto content = std::max(logoSize, textHeight);
 			const auto height = pad.top() + content + pad.bottom();
 			raw->resize(width, height);
@@ -101,8 +95,6 @@ void BuildHeader(SectionBuilder &builder) {
 			title->move(textLeft, y);
 			y += title->height() + vgap;
 			version->move(textLeft, y);
-			y += version->height() + vgap;
-			desc->move(textLeft, y);
 		}, raw->lifetime());
 
 		return { .widget = std::move(widget) };
