@@ -27,6 +27,7 @@
 #include "styles/style_menu_icons.h"
 #include "styles/style_settings.h"
 #include "ui/painter.h"
+#include "ui/ui_utility.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/labels.h"
 #include "ui/wrap/vertical_layout.h"
@@ -41,64 +42,70 @@ using namespace Builder;
 
 namespace {
 
-void BuildLogo(SectionBuilder &builder) {
+void BuildHeader(SectionBuilder &builder) {
 	builder.add([](const WidgetContext &ctx) -> SectionBuilder::WidgetToAdd {
-		auto logo = object_ptr<Ui::RpWidget>(ctx.container);
-		const auto logoRaw = logo.data();
-		logoRaw->resize(
-			QSize(st::settingsCloudPasswordIconSize,
-				st::settingsCloudPasswordIconSize));
-		logoRaw->setNaturalWidth(st::settingsCloudPasswordIconSize);
-		logoRaw->paintRequest(
+		auto widget = object_ptr<Ui::RpWidget>(ctx.container);
+		const auto raw = widget.data();
+
+		const auto logoSize = st::furryHeaderLogoSize;
+		const auto logo = Ui::CreateChild<Ui::RpWidget>(raw);
+		logo->resize(logoSize, logoSize);
+		logo->paintRequest(
 		) | rpl::on_next([=] {
-			auto p = QPainter(logoRaw);
+			auto p = QPainter(logo);
 			const auto image = AyuAssets::currentAppLogoPad();
 			if (!image.isNull()) {
-				const auto size = st::settingsCloudPasswordIconSize;
 				const auto scaled = image.scaled(
-					size * style::DevicePixelRatio(),
-					size * style::DevicePixelRatio(),
+					logoSize * style::DevicePixelRatio(),
+					logoSize * style::DevicePixelRatio(),
 					Qt::KeepAspectRatio,
 					Qt::SmoothTransformation);
-				p.drawImage(QRect(0, 0, size, size), scaled);
+				p.drawImage(QRect(0, 0, logoSize, logoSize), scaled);
 			}
-		}, logoRaw->lifetime());
-		return { .widget = std::move(logo), .align = style::al_top };
-	});
-}
+		}, logo->lifetime());
 
-void BuildVersionInfo(SectionBuilder &builder) {
-	builder.add([](const WidgetContext &ctx) -> SectionBuilder::WidgetToAdd {
-		return {
-			.widget = object_ptr<Ui::FlatLabel>(
-				ctx.container,
-				rpl::single(QString("FurryGram Desktop")),
-				st::boxTitle),
-			.align = style::al_top,
-		};
-	});
+		const auto title = Ui::CreateChild<Ui::FlatLabel>(
+			raw,
+			rpl::single(QString("FurryGram Desktop")),
+			st::furryHeaderTitle);
+		const auto version = Ui::CreateChild<Ui::FlatLabel>(
+			raw,
+			rpl::single(QString("v") + QString::fromLatin1(AppVersionStr)),
+			st::furryHeaderVersion);
+		const auto desc = Ui::CreateChild<Ui::FlatLabel>(
+			raw,
+			tr::ayu_SettingsDescription(),
+			st::furryHeaderDesc);
 
-	builder.add([](const WidgetContext &ctx) -> SectionBuilder::WidgetToAdd {
-		return {
-			.widget = object_ptr<Ui::FlatLabel>(
-				ctx.container,
-				rpl::single(
-					QString("v") + QString::fromLatin1(AppVersionStr)),
-				st::furrySettingsVersion),
-			.align = style::al_top,
-		};
-	});
+		raw->widthValue(
+		) | rpl::on_next([=](int width) {
+			const auto pad = st::furryHeaderPadding;
+			const auto gap = st::furryHeaderGap;
+			const auto vgap = st::furryHeaderTextGap;
+			const auto textLeft = pad.left() + logoSize + gap;
+			const auto textWidth = std::max(0, width - textLeft - pad.right());
 
-	builder.addSkip();
+			title->resizeToWidth(textWidth);
+			version->resizeToWidth(textWidth);
+			desc->resizeToWidth(textWidth);
 
-	builder.add([](const WidgetContext &ctx) -> SectionBuilder::WidgetToAdd {
-		return {
-			.widget = object_ptr<Ui::FlatLabel>(
-				ctx.container,
-				tr::ayu_SettingsDescription(),
-				st::centeredBoxLabel),
-			.align = style::al_top,
-		};
+			const auto textHeight = title->height() + vgap
+				+ version->height() + vgap + desc->height();
+			const auto content = std::max(logoSize, textHeight);
+			const auto height = pad.top() + content + pad.bottom();
+			raw->resize(width, height);
+
+			logo->move(pad.left(), pad.top() + (content - logoSize) / 2);
+
+			auto y = pad.top() + (content - textHeight) / 2;
+			title->move(textLeft, y);
+			y += title->height() + vgap;
+			version->move(textLeft, y);
+			y += version->height() + vgap;
+			desc->move(textLeft, y);
+		}, raw->lifetime());
+
+		return { .widget = std::move(widget) };
 	});
 }
 
@@ -197,9 +204,7 @@ const auto kMeta = BuildHelper({
 	.title = &tr::ayu_AyuPreferences,
 	.icon = &st::menuIconPremium,
 }, [](SectionBuilder &builder) {
-	BuildLogo(builder);
-	builder.addSkip();
-	BuildVersionInfo(builder);
+	BuildHeader(builder);
 	BuildCategories(builder);
 	BuildLinks(builder);
 });

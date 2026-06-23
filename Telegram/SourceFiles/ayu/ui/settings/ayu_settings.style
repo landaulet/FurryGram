@@ -23,16 +23,36 @@ centeredBoxLabel: FlatLabel(defaultFlatLabel) {
 	style: centeredBoxLabelStyle;
 }
 
-furrySettingsVersionStyle: TextStyle(boxLabelStyle) {
+furryHeaderLogoSize: 76px;
+furryHeaderGap: 18px;
+furryHeaderTextGap: 4px;
+furryHeaderPadding: margins(22px, 18px, 22px, 18px);
+
+furryHeaderTitleStyle: TextStyle(boxLabelStyle) {
+	font: font(18px semibold);
+	lineHeight: 0px;
+}
+furryHeaderTitle: FlatLabel(defaultFlatLabel) {
+	style: furryHeaderTitleStyle;
+	textFg: windowBoldFg;
+}
+
+furryHeaderVersionStyle: TextStyle(boxLabelStyle) {
 	font: font(12px semibold);
 	lineHeight: 0px;
 }
-
-furrySettingsVersion: FlatLabel(defaultFlatLabel) {
-	minWidth: 256px;
-	align: align(center);
-	style: furrySettingsVersionStyle;
+furryHeaderVersion: FlatLabel(defaultFlatLabel) {
+	style: furryHeaderVersionStyle;
 	textFg: windowActiveTextFg;
+}
+
+furryHeaderDescStyle: TextStyle(boxLabelStyle) {
+	font: font(13px);
+	lineHeight: 0px;
+}
+furryHeaderDesc: FlatLabel(defaultFlatLabel) {
+	style: furryHeaderDescStyle;
+	textFg: windowSubTextFg;
 }
 
 filtersAddIcon: IconButton(infoLayerTopBarClose) {
