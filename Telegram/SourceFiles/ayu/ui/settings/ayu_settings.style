@@ -23,6 +23,18 @@ centeredBoxLabel: FlatLabel(defaultFlatLabel) {
 	style: centeredBoxLabelStyle;
 }
 
+furrySettingsVersionStyle: TextStyle(boxLabelStyle) {
+	font: font(12px semibold);
+	lineHeight: 0px;
+}
+
+furrySettingsVersion: FlatLabel(defaultFlatLabel) {
+	minWidth: 256px;
+	align: align(center);
+	style: furrySettingsVersionStyle;
+	textFg: windowActiveTextFg;
+}
+
 filtersAddIcon: IconButton(infoLayerTopBarClose) {
 	width: 40px;
 	icon: icon {{ "menu/add", boxTitleCloseFg }};

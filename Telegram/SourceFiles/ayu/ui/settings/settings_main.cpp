@@ -72,10 +72,19 @@ void BuildVersionInfo(SectionBuilder &builder) {
 		return {
 			.widget = object_ptr<Ui::FlatLabel>(
 				ctx.container,
-				rpl::single(
-					QString("FurryGram Desktop v")
-					+ QString::fromLatin1(AppVersionStr)),
+				rpl::single(QString("FurryGram Desktop")),
 				st::boxTitle),
+			.align = style::al_top,
+		};
+	});
+
+	builder.add([](const WidgetContext &ctx) -> SectionBuilder::WidgetToAdd {
+		return {
+			.widget = object_ptr<Ui::FlatLabel>(
+				ctx.container,
+				rpl::single(
+					QString("v") + QString::fromLatin1(AppVersionStr)),
+				st::furrySettingsVersion),
 			.align = style::al_top,
 		};
 	});
@@ -94,8 +103,6 @@ void BuildVersionInfo(SectionBuilder &builder) {
 }
 
 void BuildCategories(SectionBuilder &builder) {
-	builder.addSkip();
-	builder.addSkip();
 	builder.addSkip();
 	builder.addSkip();
 	builder.addDivider();
@@ -153,21 +160,10 @@ void BuildLinks(SectionBuilder &builder) {
 		.id = u"ayu/channel"_q,
 		.title = tr::ayu_LinksChannel(),
 		.icon = { &st::menuIconChannel },
-		.label = rpl::single(QString("@ayugram")),
+		.label = rpl::single(QString("@FurryGramReleases")),
 		.onClick = [=] {
 			controller->showPeerByLink(Window::PeerByLinkInfo{
-				.usernameOrId = QString("ayugram"),
-			});
-		},
-	});
-	builder.addButton({
-		.id = u"ayu/chat"_q,
-		.title = tr::ayu_LinksChats(),
-		.icon = { &st::menuIconChats },
-		.label = rpl::single(QString("@ayugramchat")),
-		.onClick = [=] {
-			controller->showPeerByLink(Window::PeerByLinkInfo{
-				.usernameOrId = QString("ayugramchat"),
+				.usernameOrId = QString("FurryGramReleases"),
 			});
 		},
 	});
