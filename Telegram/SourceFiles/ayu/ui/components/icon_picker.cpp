@@ -24,18 +24,22 @@
 namespace {
 
 const QVector<QString> icons{
+	// FurryGram icons (own logos)
 	AyuAssets::DEFAULT_ICON,
 	AyuAssets::ALT_ICON,
-	AyuAssets::DISCORD_ICON,
-	AyuAssets::SPOTIFY_ICON,
-	AyuAssets::EXTERA_ICON,
-	AyuAssets::NOTHING_ICON,
 	AyuAssets::BARD_ICON,
-	AyuAssets::YAPLUS_ICON,
-	AyuAssets::WIN95_ICON,
 	AyuAssets::CHIBI_ICON,
 	AyuAssets::CHIBI2_ICON,
-	AyuAssets::EXTERA2_ICON,
+	// pad the remainder of the row so the disguise icons start on a fresh row
+	QString(),
+	QString(),
+	QString(),
+	// Disguise icons (mimic other apps to hide that this is a Telegram client)
+	AyuAssets::DISCORD_ICON,
+	AyuAssets::SPOTIFY_ICON,
+	AyuAssets::WIN95_ICON,
+	AyuAssets::YAPLUS_ICON,
+	AyuAssets::NOTHING_ICON,
 };
 
 const auto rows = static_cast<int>(icons.size()) / IconPicker::kColumns
