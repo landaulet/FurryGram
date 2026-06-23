@@ -92,3 +92,6 @@ AGENTS.md
 GEMINI.md
 REVIEW.md
 copilot-instructions.md
+
+# Ninja build dir (VS out/ already ignored upstream)
+out-ninja/
