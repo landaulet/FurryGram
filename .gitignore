@@ -75,9 +75,20 @@ settings.local.json
 # Project specific
 Telegram/SourceFiles/_other/packer_private.h
 
-# AI assistant / editor files (kept local, not published)
+# AI assistant / agent / editor files (kept local, not published)
 .claude/
+.agents/
+.ai/
+.cursor/
 .cursorignore
 .cursorrules
-AGENTS.md
+.windsurf/
+.windsurfrules
+.continue/
+.aider*
+.codex/
 CLAUDE.md
+AGENTS.md
+GEMINI.md
+REVIEW.md
+copilot-instructions.md
