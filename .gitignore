@@ -74,3 +74,10 @@ settings.local.json
 
 # Project specific
 Telegram/SourceFiles/_other/packer_private.h
+
+# AI assistant / editor files (kept local, not published)
+.claude/
+.cursorignore
+.cursorrules
+AGENTS.md
+CLAUDE.md
