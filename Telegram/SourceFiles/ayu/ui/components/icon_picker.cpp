@@ -30,16 +30,6 @@ const QVector<QString> icons{
 	AyuAssets::BARD_ICON,
 	AyuAssets::CHIBI_ICON,
 	AyuAssets::CHIBI2_ICON,
-	// pad the remainder of the row so the disguise icons start on a fresh row
-	QString(),
-	QString(),
-	QString(),
-	// Disguise icons (mimic other apps to hide that this is a Telegram client)
-	AyuAssets::DISCORD_ICON,
-	AyuAssets::SPOTIFY_ICON,
-	AyuAssets::WIN95_ICON,
-	AyuAssets::YAPLUS_ICON,
-	AyuAssets::NOTHING_ICON,
 };
 
 const auto rows = static_cast<int>(icons.size()) / IconPicker::kColumns
